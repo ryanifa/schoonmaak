@@ -28,7 +28,17 @@ function tokenOf(naam, fallbackBestand) {
 }
 
 export const dataDir = path.resolve(root, process.env.DATA_DIR || './data');
-fs.mkdirSync(dataDir, { recursive: true });
+try {
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.accessSync(dataDir, fs.constants.W_OK);
+} catch (fout) {
+  console.error(
+    `\nKan niet schrijven in de datamap ${dataDir}.\n`
+    + 'Controleer of de map bestaat en of dit proces er rechten op heeft.\n'
+    + 'Bij Docker: is het volume gekoppeld en van de juiste gebruiker?\n',
+  );
+  throw fout;
+}
 
 export const config = {
   root,
