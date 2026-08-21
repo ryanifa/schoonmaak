@@ -21,11 +21,21 @@ instelt zijn hieronder beschreven.
 
 ## Eenmalig instellen
 
-**1. Zet GitHub Pages aan.** Repo → *Settings* → *Pages* → bij **Source** kies je
-**GitHub Actions**. Meer niet. Er komt geen `gh-pages`-branch: de workflow
-publiceert rechtstreeks, alles blijft op `main`.
+**1. Zet de Pages-bron op GitHub Actions.** Repo → *Settings* → *Pages* → bij
+**Source** kies je **GitHub Actions**.
 
-Na de eerste push staat de app op `https://<gebruiker>.github.io/schoonmaak/`.
+Dit is belangrijk: staat de bron op *Deploy from a branch*, dan draait GitHub bij
+elke push óók een Jekyll-build van de repo-root. Die publiceert de README in
+plaats van de app, en omdat hij later klaar is dan deze workflow overschrijft hij
+de publicatie. De workflow probeert de bron zelf om te zetten
+(`configure-pages` met `enablement`), maar controleer het één keer.
+
+Je herkent het meteen: draait er naast *Testen en publiceren* ook een run met de
+naam *pages build and deployment*, dan staat de bron nog verkeerd.
+
+Er komt geen `gh-pages`-branch bij — de workflow publiceert rechtstreeks, alles
+blijft op `main`. Na de eerste geslaagde publicatie staat de app op
+`https://<gebruiker>.github.io/schoonmaak/`.
 
 **2. Maak een sleutel.** Ga naar
 [GitHub → fine-grained token](https://github.com/settings/personal-access-tokens/new)
