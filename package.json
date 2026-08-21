@@ -1,15 +1,14 @@
 {
   "name": "schoonmaak",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Weekplanner voor huishoudelijke hulp",
+  "description": "Weekplanner voor huishoudelijke hulp — draait op GitHub Pages met een Gist als opslag",
   "type": "module",
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=22"
   },
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
-    "test": "node --test --test-reporter=spec test/*.test.js"
+    "test": "node --test --test-reporter=spec test/*.test.js",
+    "dev": "node test/dev-server.js"
   }
 }

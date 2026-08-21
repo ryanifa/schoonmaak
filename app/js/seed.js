@@ -1,7 +1,8 @@
-import { db, nu, inTransactie } from './db.js';
+/* Voorbeeldbibliotheek voor een rijtjeshuis. Wordt eenmalig gebruikt bij het
+   inrichten; daarna schaaf je hem bij in de beheerdersweergave. */
 
-// Voorbeeldbibliotheek voor een rijtjeshuis. Wordt alleen gebruikt als de
-// database nog leeg is; daarna schaaf je hem bij in de beheerdersweergave.
+import { nieuwId } from './document.js';
+
 const RUIMTES = [
   'Keuken',
   'Woonkamer',
@@ -74,28 +75,33 @@ const TAKEN = [
   ['Algemeen', 'Gordijnen en vitrage wassen', 'In overleg — laat het even weten voordat je begint.', I, 30],
 ];
 
-export function seedIndienLeeg() {
-  const aantal = db.prepare('SELECT COUNT(*) AS n FROM taken').get().n;
-  if (aantal > 0) return false;
-
-  inTransactie(() => {
-    const tijd = nu();
-    const ruimteIn = db.prepare('INSERT INTO ruimtes (naam, volgorde, actief) VALUES (?, ?, 1)');
-    const ruimteIds = new Map();
-    RUIMTES.forEach((naam, i) => {
-      ruimteIds.set(naam, ruimteIn.run(naam, i).lastInsertRowid);
-    });
-
-    const taakIn = db.prepare(`
-      INSERT INTO taken (titel, ruimte_id, omschrijving, standaard_frequentie, geschatte_minuten, volgorde, actief, aangemaakt_op)
-      VALUES (?, ?, ?, ?, ?, ?, 1, ?)
-    `);
-    const volgordePerRuimte = new Map();
-    for (const [ruimte, titel, omschrijving, frequentie, minuten] of TAKEN) {
-      const v = volgordePerRuimte.get(ruimte) ?? 0;
-      volgordePerRuimte.set(ruimte, v + 1);
-      taakIn.run(titel, ruimteIds.get(ruimte), omschrijving, frequentie, minuten, v, tijd);
-    }
+/** Bouwt een compleet startdocument met ruimtes en taken. */
+export function maakVoorbeeldDocument() {
+  const ruimteIds = new Map();
+  const ruimtes = RUIMTES.map((naam, i) => {
+    const id = nieuwId('r');
+    ruimteIds.set(naam, id);
+    return { id, naam, volgorde: i, actief: true };
   });
-  return true;
+
+  const volgordePerRuimte = new Map();
+  const taken = TAKEN.map(([ruimte, titel, omschrijving, standaardFrequentie, geschatteMinuten]) => {
+    const volgorde = volgordePerRuimte.get(ruimte) ?? 0;
+    volgordePerRuimte.set(ruimte, volgorde + 1);
+    return {
+      id: nieuwId('t'),
+      titel,
+      ruimteId: ruimteIds.get(ruimte),
+      omschrijving,
+      fotoId: null,
+      standaardFrequentie,
+      geschatteMinuten,
+      volgorde,
+      actief: true,
+    };
+  });
+
+  return { versie: 1, ruimtes, taken, weken: {}, berichten: [] };
 }
+
+export const AANTAL_VOORBEELDTAKEN = TAKEN.length;

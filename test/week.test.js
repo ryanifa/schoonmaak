@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   isoWeek, startdatumVanWeek, alsDatumTekst, wekenInJaar,
   vorigeWeek, volgendeWeek, wekenTussen, maandagVan,
-} from '../src/util/week.js';
+} from '../app/js/week.js';
 
 const d = (tekst) => {
   const [j, m, dag] = tekst.split('-').map(Number);

@@ -1,170 +1,178 @@
 # Schoonmaak
 
-Een kleine weekplanner voor de huishoudelijke hulp. De beheerder stelt per week samen
-wat er gedaan moet worden; de schoonmaakster ziet op haar telefoon wát ze moet doen,
-met een voorbeeldfoto erbij, en vinkt af.
+Een kleine weekplanner voor de huishoudelijke hulp. De beheerder stelt per week
+samen wat er gedaan moet worden; de schoonmaakster ziet op haar telefoon wát ze
+moet doen, met een voorbeeldfoto erbij, en vinkt af.
 
-Eén huishouden, één schoonmaakster. Geen accounts, geen registratie — twee geheime links.
+Eén huishouden, één schoonmaakster. Geen accounts, geen registratie, geen server:
+de app draait op GitHub Pages en bewaart alles in twee Gists.
 
-## In het kort
+## Hoe het draait
 
 | | |
 |---|---|
-| Beheerdersweergave | takenbibliotheek met foto's, week samenstellen, historie, berichten |
-| Schoonmaakweergave | mobiel-first weeklijst met afvinken, opmerkingen en berichten |
-| Techniek | Node.js 22, SQLite (ingebouwd), vanilla JavaScript — **nul npm-dependencies** |
-| Opslag | één SQLite-bestand, foto's inbegrepen |
+| Hosting | GitHub Pages, gepubliceerd vanuit `main` door GitHub Actions |
+| Opslag | twee geheime Gists — één voor de gegevens, één voor de foto's |
+| Techniek | vanilla JavaScript, **geen enkele dependency**, geen bouwstap |
+| Op de telefoon | PWA: op het beginscherm te zetten en bruikbaar zonder bereik |
 
-## Snel starten
+Er is dus niets om te draaien of te betalen. De enige twee dingen die je zelf
+instelt zijn hieronder beschreven.
 
-```bash
-node --version          # 22.5 of nieuwer (voor de ingebouwde SQLite)
-cp .env.example .env    # en vul er eigen tokens in
-npm start
-```
+## Eenmalig instellen
 
-De app print bij het opstarten de twee links:
+**1. Zet GitHub Pages aan.** Repo → *Settings* → *Pages* → bij **Source** kies je
+**GitHub Actions**. Meer niet. Er komt geen `gh-pages`-branch: de workflow
+publiceert rechtstreeks, alles blijft op `main`.
 
-```
-  Beheer:      http://localhost:3000/beheer/<beheer-token>
-  Schoonmaak:  http://localhost:3000/schoonmaak/<schoonmaak-token>
-```
+Na de eerste push staat de app op `https://<gebruiker>.github.io/schoonmaak/`.
 
-Bij de eerste start wordt de database gevuld met een voorbeeldbibliotheek voor een
-rijtjeshuis: keuken, woonkamer, hal, toilet, trap, badkamer, twee slaapkamers en
-algemene taken. Ongeveer veertig taken met omschrijving, frequentie en tijdsinschatting —
-bedoeld om bij te schaven, niet om precies zo te gebruiken.
+**2. Maak een sleutel.** Ga naar
+[GitHub → fine-grained token](https://github.com/settings/personal-access-tokens/new)
+en zet bij **Account permissions → Gists** de waarde op **Read and write**. Verder
+heeft de app niets nodig; laat alle andere rechten uit staan.
 
-## Configuratie
+Open daarna de app, plak de sleutel, en klik op *Gists aanmaken en beginnen*. De
+app maakt de twee Gists, vult de takenbibliotheek met 44 voorbeeldtaken voor een
+rijtjeshuis, en geeft je twee links:
 
-Alles via omgevingsvariabelen (of een `.env`-bestand naast `package.json`).
+- **beheer** — voor jou: bibliotheek, weeklijst, historie, berichten;
+- **schoonmaak** — voor haar telefoon.
 
-| Variabele | Standaard | Betekenis |
-|---|---|---|
-| `PORT` | `3000` | Poort waarop de app luistert |
-| `DATA_DIR` | `./data` | Map met de database. **Moet persistent zijn.** |
-| `BEHEER_TOKEN` | willekeurig | Geheim deel van de beheerlink |
-| `SCHOONMAAK_TOKEN` | willekeurig | Geheim deel van de schoonmaaklink |
-| `PINCODE` | leeg (uit) | Optionele extra toegangscode |
+## Over de sleutel in de link
 
-Een nieuw token maken:
+Er is geen server, dus haar telefoon praat rechtstreeks met GitHub. Om een
+afvinkje te kunnen opslaan heeft dat toestel een sleutel nodig, en die zit
+daarom in haar link verwerkt.
 
-```bash
-node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
-```
+Dat betekent iets, en het is eerlijker om het gewoon op te schrijven: **wie die
+link heeft, kan bij de Gists van het account waar de sleutel bij hoort.** Niet bij
+je repositories, niet bij je instellingen — alleen bij Gists, en alleen als je de
+sleutel beperkt houdt zoals hierboven beschreven.
 
-Zet je `BEHEER_TOKEN` en `SCHOONMAAK_TOKEN` niet, dan genereert de app ze één keer en
-bewaart ze in `DATA_DIR`, zodat de links na een herstart blijven werken. Handig om te
-proberen; voor echt gebruik zet je ze zelf, dan kun je ze wisselen als een link uitlekt.
+Wat dat draaglijk maakt:
 
-**Pincode.** Is `PINCODE` gezet, dan vraagt de app die code één keer en onthoudt hem in
-`localStorage`. De server controleert de code bij elk verzoek — het is dus een echt slot,
-geen schermpje ervoor. Leeg laten schakelt het uit.
+- de sleutel staat achter het `#` in de link, en dat deel wordt door browsers
+  nooit naar een server gestuurd — het staat niet in serverlogboeken;
+- de app haalt de sleutel meteen na het openen uit de adresbalk, zodat hij niet
+  in de geschiedenis of op een schermafbeelding blijft staan;
+- is er iets mis, dan trek je de sleutel in bij GitHub en maak je een nieuwe. De
+  Gists blijven bestaan; koppel ze weer via *bestaande Gists gebruiken*.
 
-## Draaien in productie
+Wil je het strakker: maak een apart, gratis GitHub-account dat alleen deze Gists
+bezit, en gebruik daarvan de sleutel. Voor haar verandert er niets — het blijft
+één tik op een link.
 
-De enige harde eis is dat `DATA_DIR` een schijf is die blijft bestaan. Een
-platform zonder persistente schijf (de meeste "serverless" hosts) is niet geschikt:
-je raakt bij elke deploy alle taken en foto's kwijt.
+## Op de telefoon zetten
 
-**Docker**
+Ze opent de link één keer. Daarna: *Delen → Zet op beginscherm* (iPhone) of
+*Menu → App installeren* (Android). Vanaf dat moment opent hij als een app,
+zonder adresbalk, en ook zonder bereik.
 
-```bash
-docker build -t schoonmaak .
-docker run -d --name schoonmaak -p 3000:3000 \
-  -v schoonmaak-data:/data \
-  -e BEHEER_TOKEN=... -e SCHOONMAAK_TOKEN=... \
-  schoonmaak
-```
+## Wat er in de app zit
 
-Of met `docker compose up -d` (zie `docker-compose.yml`).
+**Beheer** — takenbibliotheek per ruimte met foto's, standaardfrequentie en
+tijdsinschatting; taken toevoegen, bewerken, herordenen en archiveren; ruimtes
+beheren. Week samenstellen met per taak **hoeveel weken geleden die voor het
+laatst gedaan is**, snelknoppen (kopieer vorige week, alles wekelijks, alles uit)
+en een notitieveld. Historie per week en per taak, plus alle opmerkingen en
+berichten met een ongelezen-markering.
 
-**Fly.io** — `fly.toml` staat klaar:
+**Schoonmaak** — de week en de notitie bovenaan, een voortgangsbalk, taken
+gegroepeerd per ruimte, grote tikbare rijen, de foto schermvullend te bekijken,
+een opmerking per taak en een knop om een bericht achter te laten. Afvinken slaat
+direct op, met tijdstempel, en kan ongedaan gemaakt worden.
 
-```bash
-fly launch --no-deploy
-fly volumes create schoonmaak_data --region ams --size 1
-fly secrets set BEHEER_TOKEN=... SCHOONMAAK_TOKEN=...
-fly deploy
-```
+## Slecht netwerk
 
-**Eigen server** — `npm start` achter een reverse proxy met HTTPS. De tokens staan in de
-URL, dus HTTPS is geen overbodige luxe.
+Ze staat te poetsen in een huis waar de wifi niet overal komt. Daarom:
 
-Back-up maken is één bestand kopiëren: `DATA_DIR/schoonmaak.db` (met `-wal` en `-shm`
-erbij als de app draait, of gewoon even stoppen).
+- de app zelf staat op het toestel (service worker) en opent dus altijd;
+- de laatst bekende weeklijst staat in de browseropslag, dus ook zonder bereik
+  ziet ze meteen wat er te doen is;
+- afvinken werkt gewoon door en komt in een wachtrij die het sluiten van de app
+  overleeft;
+- lukt opslaan niet, dan blijft **Nog niet opgeslagen** in beeld staan met een
+  knop *Opnieuw* — het mislukt nooit stilletjes;
+- zodra er weer verbinding is, gaat het vanzelf door.
+
+## Hoe het synchroniseren werkt
+
+Een Gist kent geen "schrijf alleen als er niets veranderd is". Twee apparaten die
+tegelijk opslaan zouden elkaar dus kunnen overschrijven. De app lost dat zo op:
+
+1. Elke wijziging is een **bewerking** — een klein objectje als
+   `{soort: 'weektaak.afvinken', week: '2026-34', taakId: …, afgevinkt: true}` —
+   dat meteen lokaal wordt toegepast en in een wachtrij gaat.
+2. Bij het opslaan haalt de app eerst de **verse** inhoud van de Gist op en
+   speelt de wachtrij daar bovenop af. Wat de ander intussen deed, blijft dus staan.
+3. Na het schrijven controleert de app met de ETag of er tóch nog iemand
+   tussendoor kwam. Zo ja, dan wordt de wachtrij op die nieuwe stand opnieuw
+   afgespeeld.
+
+Elke bewerking geeft bij herhaling hetzelfde resultaat, dus opnieuw afspelen is
+altijd veilig. Zo overleeft een afvinkje op de telefoon een notitie die op
+hetzelfde moment op de laptop wordt getypt — daar is een test voor.
+
+De gegevens staan in drie losse bestanden (bibliotheek, weken, berichten), zodat
+een wijziging alleen het bestand raakt waar hij bij hoort.
+
+**Foto's** staan in een eigen Gist, één bestand per foto. Een foto verandert
+nooit — een vervangen foto krijgt een nieuw id — dus zodra een toestel ze heeft,
+blijven ze in IndexedDB staan en gaat er niets meer over de lijn. De browser
+verkleint een foto naar maximaal 1100 pixels voordat er iets verstuurd wordt; een
+kiekje van 4 MB wordt zo een bestand van enkele tientallen kilobytes.
 
 ## Hoe het in elkaar zit
 
 ```
-src/
-  config.js        omgevingsvariabelen, tokens, rolbepaling
-  db.js            SQLite-schema en migraties
-  seed.js          voorbeeldbibliotheek voor een rijtjeshuis
-  repo.js          datalaag — kent geen HTTP en geen UI
-  api.js           routetabel: verzoek in, JSON uit
-  server.js        HTTP-server, statische bestanden, toegang
-  util/week.js     ISO-weeknummers
-public/
-  schoonmaak.html  de weeklijst
-  beheer.html      beheer met vier tabbladen
-  js/api.js        fetch + wachtrij die slecht netwerk overleeft
-  js/util.js       DOM-hulpjes, Nederlandse datums, foto verkleinen
-  css/app.css      alle vormgeving
+app/
+  index.html          inrichten: sleutel, Gists, de twee links
+  beheer.html         beheer met vier tabbladen
+  schoonmaak.html     de weeklijst
+  sw.js               service worker (de app offline beschikbaar)
+  js/
+    document.js       het datamodel en alle bewerkingen — puur, geen netwerk of DOM
+    week.js           ISO-weeknummers
+    seed.js           voorbeeldbibliotheek voor een rijtjeshuis
+    gist.js           de enige plek die van de GitHub-API weet
+    opslag.js         document, wachtrij, samenvoegen en wegschrijven
+    fotos.js          foto-Gist met IndexedDB ernaast
+    config.js         toegang uit de link, opslaan, adresbalk opschonen
+    beheer.js         de beheerdersweergave
+    schoonmaak.js     de schoonmaakweergave
+    util.js melding.js modaal.js fotoscherm.js status.js pwa.js
+  css/app.css
 ```
 
-Het datamodel staat los van de UI: `repo.js` is puur data, `api.js` vertaalt HTTP naar
-die datalaag, en de browser praat alleen met de JSON-API. Een tweede huishouden of een
-mobiele app erbij bouwen raakt daardoor alleen de randen.
-
-### Datamodel
-
-- **Ruimte** — Keuken, Badkamer, … Beheerbaar, herordenbaar, archiveerbaar.
-- **Taak** — hoort bij een ruimte; titel, omschrijving, één foto, standaardfrequentie,
-  geschatte minuten, volgorde, actief.
-- **Week** — ISO-jaar + weeknummer, startdatum, notitie van de beheerder.
-- **Weektaak** — koppeling week ↔ taak, met `afgevinkt`, `afgevinktOp` en `opmerking`.
-- **Bericht** — algemene meldingen ("de stofzuiger is stuk"), met gelezen-markering.
-
-De takenbibliotheek en de weeklijst staan bewust los van elkaar: niet elke taak hoeft
-elke week. Een taak archiveren of hernoemen laat de historie intact.
-
-## Slecht netwerk
-
-Afvinken mag niet stilletjes mislukken. Schrijfacties gaan daarom door een wachtrij:
-
-- de UI reageert meteen, het verzoek gaat op de wachtrij;
-- lukt het, dan verschijnt kort **Opgeslagen**;
-- lukt het niet, dan blijft **Nog niet opgeslagen** in beeld staan mét een knop
-  *Opnieuw*, en probeert de app het zelf opnieuw met oplopende tussenpozen;
-- de wachtrij staat in `localStorage` en overleeft dus het sluiten van de pagina;
-- zodra het netwerk terug is (of het tabblad weer zichtbaar wordt) gaat het vanzelf door.
-
-Per taak telt alleen de laatste stand, dus drie keer aan-en-uit tikken levert één verzoek
-op. Afvinken en opmerkingen zijn idempotent; berichten hebben een `clientId` zodat een
-herhaalde verzending geen dubbel bericht oplevert.
-
-## Foto's
-
-De browser verkleint een foto naar maximaal 1400 pixels en comprimeert hem tot JPEG
-voordat er iets verstuurd wordt — een kiekje van 4 MB wordt zo een bestand van een paar
-honderd kilobyte. De server slaat hem op in de database en serveert hem met een lange
-cache-header, zodat een foto op de telefoon maar één keer geladen hoeft te worden.
-Foto's zijn alleen bereikbaar mét geldig token.
+`document.js` weet niets van GitHub of van de browser: het zijn pure functies van
+document plus bewerking naar nieuw document. Daardoor is het datamodel los te
+testen en later uit te breiden.
 
 ## Testen
 
 ```bash
-npm test
+npm test        # 42 tests
+npm run dev     # bekijk de app lokaal op http://localhost:4321
 ```
 
-27 tests: ISO-weeklogica (inclusief jaren met 53 weken), de datalaag (afvinkjes die
-bewaard blijven als de weeklijst verandert, "hoe lang geleden", kopiëren van de vorige
-week) en de HTTP-API (rolscheiding, foto-upload, validatie, pincode, geen uitbraak uit
-de `public`-map).
+De tests draaien ook bij elke push; publiceren gebeurt alleen als ze slagen.
+
+Wat ze afdekken: ISO-weeklogica inclusief jaren met 53 weken; alle bewerkingen op
+het datamodel; en het synchroniseren tegen een **nagebouwde Gist-API**
+(`test/nep-gist.js`) — gelijktijdig werken op telefoon en laptop, een wachtrij die
+een herstart overleeft, offline openen, een verkeerde sleutel, een beschadigd
+bestand in de Gist, en dat foto's maar één keer worden opgehaald.
+
+Eén ding is bewust nagebootst en niet echt getest: de verzoeken naar
+`api.github.com` zelf. Die zijn in deze omgeving niet bereikbaar. De app rekent
+daarom nergens op onbewezen gedrag — als de ETag onverhoopt niet leesbaar is,
+werkt alles nog steeds, alleen wordt er wat vaker gedownload. Ook daar is een
+test voor.
 
 ## Bewust niet gebouwd
 
-Meerdere huishoudens, urenregistratie, notificaties, foto's als bewijs achteraf, en het
-automatisch genereren van de weeklijst op basis van frequentie. De structuur staat het
-toe — `standaardFrequentie` en de historie per taak liggen er al voor klaar.
+Meerdere huishoudens, urenregistratie, notificaties, foto's als bewijs achteraf,
+en het automatisch samenstellen van de weeklijst op basis van frequentie. De
+structuur staat het toe: `standaardFrequentie` en de historie per taak liggen er
+al voor klaar.

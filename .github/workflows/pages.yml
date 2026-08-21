@@ -1,0 +1,44 @@
+name: Testen en publiceren
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Publiceren gebeurt rechtstreeks vanuit deze workflow. Er wordt dus geen
+# aparte gh-pages-branch aangemaakt; alles blijft op main.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  testen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Tests draaien
+        run: npm test
+
+  publiceren:
+    needs: testen
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.publiceren.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: App klaarzetten
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: app
+      - id: publiceren
+        uses: actions/deploy-pages@v4

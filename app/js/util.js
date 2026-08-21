@@ -92,7 +92,7 @@ export function meervoud(aantal, enkel, meer) {
 }
 
 /** Verkleint en comprimeert een foto in de browser vóór het uploaden. */
-export async function verkleinAfbeelding(bestand, maxZijde = 1400, kwaliteit = 0.82) {
+export async function verkleinAfbeelding(bestand, maxZijde = 1100, kwaliteit = 0.78) {
   const bitmap = await maakBitmap(bestand);
   const schaal = Math.min(1, maxZijde / Math.max(bitmap.width, bitmap.height));
   const breedte = Math.max(1, Math.round(bitmap.width * schaal));
@@ -106,6 +106,17 @@ export async function verkleinAfbeelding(bestand, maxZijde = 1400, kwaliteit = 0
   const blob = await new Promise((klaar) => canvas.toBlob(klaar, 'image/jpeg', kwaliteit));
   if (!blob) throw new Error('Foto kon niet verwerkt worden.');
   return blob;
+}
+
+/** Een foto als base64-tekst, want een Gist kan alleen tekst bewaren. */
+export async function alsBase64(blob) {
+  const buffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binair = '';
+  for (let i = 0; i < bytes.length; i += 8192) {
+    binair += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+  return btoa(binair);
 }
 
 function maakBitmap(bestand) {
