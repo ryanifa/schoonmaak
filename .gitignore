@@ -1,0 +1,8 @@
+node_modules/
+
+# De datamap bevat de database, de foto's en de gegenereerde tokens.
+data/*
+!data/.gitkeep
+
+.env
+.DS_Store

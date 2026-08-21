@@ -1,0 +1,15 @@
+services:
+  schoonmaak:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - schoonmaak-data:/data
+    environment:
+      BEHEER_TOKEN: ${BEHEER_TOKEN:?stel BEHEER_TOKEN in}
+      SCHOONMAAK_TOKEN: ${SCHOONMAAK_TOKEN:?stel SCHOONMAAK_TOKEN in}
+      PINCODE: ${PINCODE:-}
+
+volumes:
+  schoonmaak-data:

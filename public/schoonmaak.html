@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#faf9f6">
+<meta name="robots" content="noindex, nofollow">
+<title>Weeklijst</title>
+<link rel="stylesheet" href="/css/app.css">
+<link rel="icon" href="/icoon.svg" type="image/svg+xml">
+</head>
+<body>
+
+<header class="kop">
+  <div class="kop-binnen">
+    <h1 id="weektitel">Weeklijst laden…</h1>
+    <p class="ondertitel" id="weekonder"></p>
+  </div>
+</header>
+
+<main class="omhulsel">
+  <div id="notitie"></div>
+  <div class="voortgang" id="voortgang"></div>
+  <div id="lijst">
+    <div class="laadskelet" aria-hidden="true"><div></div><div></div><div></div><div></div></div>
+  </div>
+  <div id="klaar"></div>
+
+  <hr class="scheider">
+
+  <button class="knop vol" id="bericht-knop" type="button">💬 Bericht achterlaten</button>
+  <p class="hulp" style="text-align:center">Voor dingen die niet bij één taak horen — bijvoorbeeld iets dat op is of stuk.</p>
+
+  <div id="berichten"></div>
+</main>
+
+<script type="module" src="/js/schoonmaak.js"></script>
+</body>
+</html>

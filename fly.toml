@@ -1,0 +1,27 @@
+# Voorbeeldconfiguratie voor Fly.io. Aanpassen: app-naam en regio.
+app = "schoonmaak"
+primary_region = "ams"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+  DATA_DIR = "/data"
+
+# De database staat op een volume; zonder volume ben je bij elke deploy alles kwijt.
+# Aanmaken met:  fly volumes create schoonmaak_data --region ams --size 1
+[[mounts]]
+  source = "schoonmaak_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
