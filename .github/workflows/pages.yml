@@ -35,7 +35,12 @@ jobs:
       url: ${{ steps.publiceren.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      # enablement zet de Pages-bron op "GitHub Actions". Zonder dat draait
+      # GitHub daarnaast nog een Jekyll-build van de repo-root, en die zou deze
+      # publicatie overschrijven.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - name: App klaarzetten
         uses: actions/upload-pages-artifact@v3
         with:
