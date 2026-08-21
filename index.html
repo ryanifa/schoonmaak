@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pages staat nog verkeerd ingesteld</title>
+<link rel="stylesheet" href="./app/css/app.css">
+</head>
+<body>
+<!--
+  Deze pagina verschijnt alleen als de Pages-bron nog op "Deploy from a branch"
+  staat. Dan publiceert GitHub namelijk de repo-root in plaats van de map app/.
+  Zodra de bron op "GitHub Actions" staat, publiceert de workflow app/ en is
+  dit bestand niet meer in beeld.
+-->
+<main class="omhulsel" style="padding-top:48px">
+  <div class="kaart">
+    <div class="kaart-kop"><h2>De app staat er wel, maar wordt nog niet gepubliceerd</h2></div>
+    <div class="kaart-binnen">
+      <p>GitHub publiceert nu de repo-root in plaats van de map <code>app/</code>.
+        Dat komt doordat de Pages-bron nog op <em>Deploy from a branch</em> staat.</p>
+      <p><strong>Eenmalig goedzetten:</strong> ga naar
+        <em>Settings → Pages</em> en kies bij <strong>Source</strong> de optie
+        <strong>GitHub&nbsp;Actions</strong>. Draai daarna de workflow
+        <em>Testen en publiceren</em> opnieuw, of push iets kleins.</p>
+      <p class="hulp">Waarom dit uitmaakt: bij een branch-bron draait GitHub bij elke push
+        ook een eigen Jekyll-build. Die is later klaar dan de workflow en overschrijft
+        de publicatie, dus je zou steeds de verkeerde inhoud zien.</p>
+      <div class="knoppenrij">
+        <a class="knop primair" href="https://github.com/ryanifa/schoonmaak/settings/pages">Naar de Pages-instelling</a>
+        <a class="knop" href="./app/">App alvast bekijken</a>
+      </div>
+      <p class="hulp">Richt de app pas in als de instelling goed staat: de links die je
+        nu zou maken bevatten <code>/app/</code> en werken straks niet meer.</p>
+    </div>
+  </div>
+</main>
+</body>
+</html>
