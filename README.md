@@ -34,6 +34,14 @@ ziet werken, werkt straks ook echt.
 Een oranje balk bovenin herinnert je eraan dat je in de testmodus zit. Op de
 inrichtingspagina staat een knop om hem te verlaten en de testgegevens te wissen.
 
+Je kunt ook rechtstreeks naar een van beide weergaven:
+
+- schoonmaakster — `schoonmaak.html#c=eyJ4IjoxLCJyIjoic2Nob29ubWFha3N0ZXIifQ`
+- beheer — `beheer.html#c=eyJ4IjoxLCJyIjoiYmVoZWVyZGVyIn0`
+
+Zo'n link vult zichzelf: is er in die browser nog niets, dan zet de app de
+voorbeeldgegevens alsnog klaar.
+
 ## Eenmalig instellen
 
 **1. Zet de Pages-bron op GitHub Actions.** Repo → *Settings* → *Pages* → bij

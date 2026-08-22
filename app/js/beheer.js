@@ -47,6 +47,11 @@ async function begin() {
   }
 
   toonTestbalkIndienNodig(toegang);
+  if (toegang.test) {
+    // Een testlink kan ook rechtstreeks geopend worden; dan is er nog niets gevuld.
+    const { zorgVoorTestgegevens } = await import('./testdata.js');
+    await zorgVoorTestgegevens();
+  }
   opslag = new Opslag(toegang);
   fotos = new FotoOpslag(toegang);
   volgOpslag(opslag);

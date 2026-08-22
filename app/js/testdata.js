@@ -4,6 +4,7 @@
 import { maakVoorbeeldDocument } from './seed.js';
 import { speelAf, weekSleutel, nieuwId } from './document.js';
 import { huidigeWeek, vorigeWeek, startdatumVanWeek, alsDatumTekst } from './week.js';
+import { LokaleBron } from './bron.js';
 
 /** Tijdstip op een dag in een week, als ISO-tekst. */
 function tijdIn(jaar, weeknummer, dagOffset, uur, minuut) {
@@ -89,6 +90,20 @@ export function maakTestDocument() {
   });
 
   return speelAf(doc, bewerkingen);
+}
+
+/**
+ * Zorgt dat er testgegevens klaarstaan. Nodig omdat een testlink ook rechtstreeks
+ * geopend kan worden, zonder eerst langs de inrichtingspagina te gaan.
+ * @returns {boolean} of er nu gevuld is
+ */
+export async function zorgVoorTestgegevens() {
+  const bron = new LokaleBron('data');
+  const stand = await bron.haal(null);
+  if (Object.keys(stand.bestanden || {}).length) return false;
+  const { documentNaarBestanden } = await import('./opslag.js');
+  await bron.schrijf(documentNaarBestanden(maakTestDocument()));
+  return true;
 }
 
 export { alsDatumTekst };

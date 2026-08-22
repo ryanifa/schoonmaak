@@ -80,12 +80,12 @@ function toonStap1(fout = '') {
 
 /* ---------------------------------------------------------------- testmodus */
 
-function startTestmodus() {
-  // Zet een gevulde week klaar, zodat er meteen iets te zien en te doen is.
+async function startTestmodus() {
+  // Altijd vers beginnen als je hier bewust op klikt.
   const bron = new LokaleBron('data');
   bron.wis();
   new LokaleBron('fotos').wis();
-  bron.schrijf(documentNaarBestanden(maakTestDocument()));
+  await bron.schrijf(documentNaarBestanden(maakTestDocument()));
 
   toegang = testToegang('beheerder');
   bewaarToegang(toegang);
