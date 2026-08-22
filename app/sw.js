@@ -2,7 +2,7 @@
    opent. Gegevens gaan hier niet doorheen — die regelt de app zelf, met een
    wachtrij en een momentopname in de browseropslag. */
 
-const VERSIE = 'schoonmaak-v1';
+const VERSIE = 'schoonmaak-v2';
 const SCHIL = [
   './',
   './index.html',
@@ -12,6 +12,7 @@ const SCHIL = [
   './icoon.svg',
   './manifest.webmanifest',
   './js/beheer.js',
+  './js/bron.js',
   './js/config.js',
   './js/document.js',
   './js/fotos.js',
@@ -25,6 +26,8 @@ const SCHIL = [
   './js/seed.js',
   './js/setup.js',
   './js/status.js',
+  './js/testbanner.js',
+  './js/testdata.js',
   './js/util.js',
   './js/week.js',
 ];

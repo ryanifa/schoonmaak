@@ -3,7 +3,7 @@
    de foto's zijn dat niet. Eenmaal opgehaalde foto's blijven in IndexedDB staan,
    zodat de telefoon ze offline ook heeft en er daarna niets meer geladen hoeft. */
 
-import { haalGist, schrijfGist } from './gist.js';
+import { bronVoor } from './bron.js';
 
 const DB_NAAM = 'schoonmaak-fotos';
 const WINKEL = 'fotos';
@@ -48,13 +48,15 @@ async function naarDb(paren) {
 const bestandsnaam = (fotoId) => `foto-${fotoId}.b64`;
 
 export class FotoOpslag extends EventTarget {
-  constructor(toegang) {
+  constructor(toegang, { bron = null } = {}) {
     super();
     this.toegang = toegang;
+    this.bron = bron || bronVoor(toegang, 'fotos');
     this.fotos = new Map();   // fotoId -> data-URL
     this.etag = null;
     this.geladen = false;
     this.bezig = null;
+    this.cacheSleutel = toegang.test ? 'index-test' : `index-${toegang.fotoGist || 'geen'}`;
   }
 
   url(fotoId) {
@@ -72,14 +74,14 @@ export class FotoOpslag extends EventTarget {
    * @param {Iterable<string>} [nodigeIds] de foto's die de weergave nu nodig heeft
    */
   async laad(nodigeIds = null) {
-    if (!this.toegang.fotoGist) { this.geladen = true; return; }
+    if (!this.bron) { this.geladen = true; return; }
     if (this.bezig) return this.bezig;
     this.bezig = this.laadNu(nodigeIds).finally(() => { this.bezig = null; });
     return this.bezig;
   }
 
   async laadNu(nodigeIds) {
-    const bewaard = await uitDb('index');
+    const bewaard = await uitDb(this.cacheSleutel);
     if (bewaard?.fotos) {
       this.fotos = new Map(Object.entries(bewaard.fotos));
       this.etag = bewaard.etag || null;
@@ -92,7 +94,7 @@ export class FotoOpslag extends EventTarget {
     }
 
     try {
-      const antwoord = await haalGist(this.toegang.sleutel, this.toegang.fotoGist, this.etag);
+      const antwoord = await this.bron.haal(this.etag);
       if (antwoord.ongewijzigd) { this.geladen = true; return; }
 
       const nieuw = new Map();
@@ -104,7 +106,7 @@ export class FotoOpslag extends EventTarget {
       this.fotos = nieuw;
       this.etag = antwoord.etag;
       this.geladen = true;
-      await naarDb([['index', { fotos: Object.fromEntries(nieuw), etag: this.etag }]]);
+      await naarDb([[this.cacheSleutel, { fotos: Object.fromEntries(nieuw), etag: this.etag }]]);
       this.dispatchEvent(new Event('verandering'));
     } catch (fout) {
       // Zonder netwerk werken we met wat er in IndexedDB staat.
@@ -114,18 +116,18 @@ export class FotoOpslag extends EventTarget {
 
   /** Voegt een foto toe. `base64` is de inhoud zonder 'data:'-voorvoegsel. */
   async bewaar(fotoId, base64) {
-    await schrijfGist(this.toegang.sleutel, this.toegang.fotoGist, { [bestandsnaam(fotoId)]: base64 });
+    await this.bron.schrijf({ [bestandsnaam(fotoId)]: base64 });
     this.fotos.set(fotoId, `data:image/jpeg;base64,${base64}`);
     this.etag = null; // volgende keer opnieuw ophalen
-    await naarDb([['index', { fotos: Object.fromEntries(this.fotos), etag: null }]]);
+    await naarDb([[this.cacheSleutel, { fotos: Object.fromEntries(this.fotos), etag: null }]]);
     this.dispatchEvent(new Event('verandering'));
   }
 
   async verwijder(fotoId) {
-    await schrijfGist(this.toegang.sleutel, this.toegang.fotoGist, { [bestandsnaam(fotoId)]: null });
+    await this.bron.schrijf({ [bestandsnaam(fotoId)]: null });
     this.fotos.delete(fotoId);
     this.etag = null;
-    await naarDb([['index', { fotos: Object.fromEntries(this.fotos), etag: null }]]);
+    await naarDb([[this.cacheSleutel, { fotos: Object.fromEntries(this.fotos), etag: null }]]);
     this.dispatchEvent(new Event('verandering'));
   }
 }

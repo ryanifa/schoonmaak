@@ -10,8 +10,9 @@ import { meld } from './melding.js';
 import {
   FREQUENTIES, weekSleutel, nieuwId, ruimteLijst, taakLijst, weekOverzicht,
   weekSamensteller, historie, taakHistorie, alleOpmerkingen, aantalOngelezen,
-  takenVanVorigeWeek,
+  takenVanVorigeWeek, lopendBezoek, gewerkteMinuten, alsDuur, haalWeek,
 } from './document.js';
+import { toonTestbalkIndienNodig } from './testbanner.js';
 import { huidigeWeek } from './week.js';
 import {
   el, leeg, voegToe, $, $$, langeDatum, korteDatum, tijdstempel,
@@ -45,6 +46,7 @@ async function begin() {
     ]));
   }
 
+  toonTestbalkIndienNodig(toegang);
   opslag = new Opslag(toegang);
   fotos = new FotoOpslag(toegang);
   volgOpslag(opslag);
@@ -182,11 +184,18 @@ function tekenWeek() {
     ]),
   ]));
 
+  const weekStand = haalWeek(doc(), sam.week.jaar, sam.week.weeknummer);
+  const gewerkt = gewerkteMinuten(weekStand);
+  const bezig = !!lopendBezoek(weekStand);
+
   doel.append(el('div', { class: 'kaart' }, [
     el('div', { class: 'kaart-binnen' }, [
       el('div', { class: 'rij', stijl: { flexWrap: 'wrap', gap: '8px', marginBottom: '12px' } }, [
         el('span', { class: 'label accent', tekst: `${meervoud(gekozen.length, 'taak', 'taken')} gepland` }),
         minuten ? el('span', { class: 'label', tekst: `± ${Math.round(minuten / 5) * 5} minuten` }) : null,
+        bezig
+          ? el('span', { class: 'label waarschuwing', tekst: `nu bezig · ${alsDuur(gewerkt)}` })
+          : gewerkt ? el('span', { class: 'label', tekst: `gewerkt: ${alsDuur(gewerkt)}` }) : null,
         el('span', { class: 'label stil', tekst: `${alle.length} taken in de bibliotheek` }),
       ]),
       el('div', { class: 'knoppenrij' }, [
@@ -583,6 +592,7 @@ function tekenHistorieWeek(w, nu) {
           class: `label${percentage === 100 ? ' accent' : percentage < 50 ? ' waarschuwing' : ''}`,
           tekst: `${w.afgevinkt} van ${w.gepland} gedaan`,
         }),
+        w.gewerkteMinuten ? el('span', { class: 'label', tekst: `${alsDuur(w.gewerkteMinuten)} gewerkt` }) : null,
         w.notitie ? el('span', { class: 'label stil', tekst: '✎ notitie' }) : null,
       ]),
       el('span', { class: 'balk', stijl: { marginTop: '8px', display: 'block' } }, [
@@ -601,6 +611,10 @@ function wisselWeekDetail(w, houder) {
     data.week.notitie ? el('div', { class: 'notitie' }, [
       el('div', { class: 'label', tekst: 'Notitie' }), el('p', { tekst: data.week.notitie }),
     ]) : null,
+    data.bezoeken?.length ? el('div', { stijl: { marginBottom: '12px' } }, [
+      el('div', { class: 'klein', stijl: { fontWeight: '650', marginBottom: '4px' }, tekst: 'Gewerkt' }),
+      ...data.bezoeken.map((b) => el('div', { class: 'klein stil', tekst: beschrijfBezoek(b) })),
+    ]) : null,
     ...data.groepen.map((groep) => el('div', { stijl: { marginBottom: '10px' } }, [
       el('div', { class: 'klein', stijl: { fontWeight: '650', marginBottom: '4px' }, tekst: groep.ruimteNaam }),
       ...groep.taken.map((taak) => el('div', { class: 'klein', stijl: { display: 'flex', gap: '8px', padding: '3px 0' } }, [
@@ -613,6 +627,16 @@ function wisselWeekDetail(w, houder) {
       ])),
     ])),
   ]));
+}
+
+/** "dinsdag 9:00 – 11:30 (2 uur 30)" */
+function beschrijfBezoek(bezoek) {
+  const start = new Date(bezoek.gestartOp);
+  const klok = (d) => `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+  if (!bezoek.gestoptOp) return `${langeDatum(start)} vanaf ${klok(start)} — niet afgesloten`;
+  const eind = new Date(bezoek.gestoptOp);
+  const duur = Math.round((eind - start) / 60000);
+  return `${langeDatum(start)} ${klok(start)} – ${klok(eind)} (${alsDuur(duur)})`;
 }
 
 function toonTaakHistorie(taak) {

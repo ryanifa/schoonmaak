@@ -19,6 +19,21 @@ de app draait op GitHub Pages en bewaart alles in twee Gists.
 Er is dus niets om te draaien of te betalen. De enige twee dingen die je zelf
 instelt zijn hieronder beschreven.
 
+## Eerst even rondkijken zonder sleutel
+
+Op de openingspagina staat **Testmodus starten**. Daarmee draait de hele app —
+inclusief een gevulde takenbibliotheek, zes weken historie en een week die half
+af is — maar blijft alles in je browser. Er gaat niets naar GitHub, en je hebt er
+geen sleutel voor nodig.
+
+De testmodus gebruikt precies dezelfde code als het echte werk: dezelfde
+wachtrij, dezelfde manier van samenvoegen. Alleen de plek waar de bestanden heen
+gaan verschilt (`LokaleBron` in plaats van `GistBron`). Wat je in de testmodus
+ziet werken, werkt straks ook echt.
+
+Een oranje balk bovenin herinnert je eraan dat je in de testmodus zit. Op de
+inrichtingspagina staat een knop om hem te verlaten en de testgegevens te wissen.
+
 ## Eenmalig instellen
 
 **1. Zet de Pages-bron op GitHub Actions.** Repo → *Settings* → *Pages* → bij
@@ -88,10 +103,22 @@ laatst gedaan is**, snelknoppen (kopieer vorige week, alles wekelijks, alles uit
 en een notitieveld. Historie per week en per taak, plus alle opmerkingen en
 berichten met een ongelezen-markering.
 
-**Schoonmaak** — de week en de notitie bovenaan, een voortgangsbalk, taken
-gegroepeerd per ruimte, grote tikbare rijen, de foto schermvullend te bekijken,
-een opmerking per taak en een knop om een bericht achter te laten. Afvinken slaat
-direct op, met tijdstempel, en kan ongedaan gemaakt worden.
+**Schoonmaak** — bovenaan een grote knop **Ik begin**; daarna loopt de tijd mee
+en staat er **Ik ben klaar**. Bij het afsluiten volgt een korte samenvatting:
+hoelang er gewerkt is en hoeveel taken er af zijn. Meerdere keren op een week kan
+gewoon; de tijden tellen bij elkaar op.
+
+Verder: de week en de notitie bovenaan, een voortgangsbalk, taken gegroepeerd per
+ruimte, grote tikbare rijen, de foto schermvullend te bekijken, een opmerking per
+taak en een knop om een bericht achter te laten. Afvinken slaat direct op, met
+tijdstempel, en kan ongedaan gemaakt worden.
+
+De gewerkte tijd komt terug in het beheer: als label bij de week, en in de
+historie per week met de exacte begin- en eindtijden.
+
+Vergeet ze op *klaar* te tikken, dan telt die keer niet mee — een bezoek dat op
+een eerdere dag begon en nooit is afgesloten levert geen fantasie-uren op. De app
+meldt het wel.
 
 ## Slecht netwerk
 
@@ -146,7 +173,9 @@ app/
     week.js           ISO-weeknummers
     seed.js           voorbeeldbibliotheek voor een rijtjeshuis
     gist.js           de enige plek die van de GitHub-API weet
+    bron.js           waar bestanden heen gaan: de Gist, of lokaal (testmodus)
     opslag.js         document, wachtrij, samenvoegen en wegschrijven
+    testdata.js       gevulde voorbeeldweken voor de testmodus
     fotos.js          foto-Gist met IndexedDB ernaast
     config.js         toegang uit de link, opslaan, adresbalk opschonen
     beheer.js         de beheerdersweergave
@@ -162,17 +191,18 @@ testen en later uit te breiden.
 ## Testen
 
 ```bash
-npm test        # 42 tests
+npm test        # 52 tests
 npm run dev     # bekijk de app lokaal op http://localhost:4321
 ```
 
 De tests draaien ook bij elke push; publiceren gebeurt alleen als ze slagen.
 
 Wat ze afdekken: ISO-weeklogica inclusief jaren met 53 weken; alle bewerkingen op
-het datamodel; en het synchroniseren tegen een **nagebouwde Gist-API**
-(`test/nep-gist.js`) — gelijktijdig werken op telefoon en laptop, een wachtrij die
-een herstart overleeft, offline openen, een verkeerde sleutel, een beschadigd
-bestand in de Gist, en dat foto's maar één keer worden opgehaald.
+het datamodel, inclusief starten en klaar melden; en het synchroniseren tegen een
+**nagebouwde Gist-API** (`test/nep-gist.js`) — gelijktijdig werken op telefoon en
+laptop, een wachtrij die een herstart overleeft, offline openen, een verkeerde
+sleutel, een beschadigd bestand in de Gist, en dat foto's maar één keer worden
+opgehaald.
 
 Eén ding is bewust nagebootst en niet echt getest: de verzoeken naar
 `api.github.com` zelf. Die zijn in deze omgeving niet bereikbaar. De app rekent
@@ -182,7 +212,7 @@ test voor.
 
 ## Bewust niet gebouwd
 
-Meerdere huishoudens, urenregistratie, notificaties, foto's als bewijs achteraf,
-en het automatisch samenstellen van de weeklijst op basis van frequentie. De
-structuur staat het toe: `standaardFrequentie` en de historie per taak liggen er
-al voor klaar.
+Meerdere huishoudens, facturatie, notificaties, foto's als bewijs achteraf, en
+het automatisch samenstellen van de weeklijst op basis van frequentie. De
+structuur staat het toe: `standaardFrequentie`, de historie per taak en de
+geregistreerde tijden liggen er al voor klaar.

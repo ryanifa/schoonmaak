@@ -3,7 +3,9 @@
 import { controleerSleutel, maakGist, haalGist, GistFout } from './gist.js';
 import { documentNaarBestanden } from './opslag.js';
 import { maakVoorbeeldDocument, AANTAL_VOORBEELDTAKEN } from './seed.js';
-import { maakLink, bewaarToegang, haalToegang, vergeetToegang } from './config.js';
+import { maakLink, bewaarToegang, haalToegang, vergeetToegang, testToegang } from './config.js';
+import { LokaleBron } from './bron.js';
+import { maakTestDocument } from './testdata.js';
 import { el, leeg, $, voegToe } from './util.js';
 import { meld } from './melding.js';
 
@@ -12,7 +14,7 @@ let toegang = null;
 
 function begin() {
   const bestaand = haalToegang('beheerder');
-  if (bestaand?.sleutel && bestaand?.dataGist) {
+  if (bestaand?.test || (bestaand?.sleutel && bestaand?.dataGist)) {
     toegang = bestaand;
     toonKlaar({ alBekend: true });
   } else {
@@ -64,8 +66,30 @@ function toonStap1(fout = '') {
       fout ? el('p', { class: 'hulp', stijl: { color: 'var(--fout)' }, tekst: fout }) : null,
       el('button', { class: 'knop primair vol', id: 'verder', type: 'submit', tekst: 'Verder' }),
     ]),
+  ]),
+  el('div', { class: 'kaart' }, [
+    el('div', { class: 'kaart-kop' }, [el('h3', { tekst: 'Even rondkijken zonder sleutel' })]),
+    el('div', { class: 'kaart-binnen' }, [
+      el('p', { tekst: 'In de testmodus draait de hele app, maar blijft alles in deze browser. Handig om te bekijken hoe het werkt voordat je een sleutel maakt.' }),
+      el('p', { class: 'hulp', tekst: 'Er wordt niets naar GitHub gestuurd. De takenbibliotheek en een half afgewerkte week staan alvast klaar.' }),
+      el('button', { class: 'knop vol', id: 'testmodus', type: 'button', tekst: '🧪 Testmodus starten', onclick: startTestmodus }),
+    ]),
   ]));
   setTimeout(() => sleutelVeld.focus(), 60);
+}
+
+/* ---------------------------------------------------------------- testmodus */
+
+function startTestmodus() {
+  // Zet een gevulde week klaar, zodat er meteen iets te zien en te doen is.
+  const bron = new LokaleBron('data');
+  bron.wis();
+  new LokaleBron('fotos').wis();
+  bron.schrijf(documentNaarBestanden(maakTestDocument()));
+
+  toegang = testToegang('beheerder');
+  bewaarToegang(toegang);
+  toonKlaar({});
 }
 
 /* ------------------------------------------------------------------- stap 2 */
@@ -144,53 +168,81 @@ async function koppelBestaand(sleutel, dataGist, fotoGist) {
 function toonKlaar({ alBekend }) {
   const beheerLink = maakLink(location.href, 'beheerder', toegang);
   const hulpLink = maakLink(location.href, 'schoonmaakster', toegang);
+  const test = !!toegang.test;
 
   voegToe(leeg(scherm()),
     alBekend ? null : el('div', { class: 'klaar-melding' }, [
-      el('div', { class: 'groot', tekst: '✨' }),
-      el('h2', { tekst: 'Alles staat klaar' }),
-      el('p', { tekst: 'Hieronder staan je twee links.' }),
+      el('div', { class: 'groot', tekst: test ? '🧪' : '✨' }),
+      el('h2', { tekst: test ? 'Testmodus staat aan' : 'Alles staat klaar' }),
+      el('p', { tekst: test ? 'Loop de app rustig door. Alles blijft in deze browser.' : 'Hieronder staan je twee links.' }),
     ]),
 
     linkKaart({
-      titel: 'Voor jou — beheer',
+      titel: test ? 'Beheer bekijken' : 'Voor jou — beheer',
       uitleg: 'Takenbibliotheek, weeklijst samenstellen, historie en berichten.',
       link: beheerLink,
       knopTekst: 'Beheer openen',
+      toonLink: !test,
     }),
 
     linkKaart({
-      titel: 'Voor de schoonmaakster',
-      uitleg: 'Stuur deze link naar haar telefoon. Ze tikt hem één keer aan; daarna kan ze hem op haar beginscherm zetten en werkt hij als een app, ook zonder bereik.',
+      titel: test ? 'De schoonmaakweergave bekijken' : 'Voor de schoonmaakster',
+      uitleg: test
+        ? 'Zo ziet het eruit op haar telefoon: starten, afvinken, opmerkingen en klaar melden. Maak je venster smal om het als telefoon te zien.'
+        : 'Stuur deze link naar haar telefoon. Ze tikt hem één keer aan; daarna kan ze hem op haar beginscherm zetten en werkt hij als een app, ook zonder bereik.',
       link: hulpLink,
-      knopTekst: 'Bekijken zoals zij het ziet',
+      knopTekst: test ? 'Weeklijst openen' : 'Bekijken zoals zij het ziet',
+      toonLink: !test,
     }),
 
-    el('div', { class: 'kaart' }, [
-      el('div', { class: 'kaart-kop' }, [el('h3', { tekst: 'Waar je op moet letten' })]),
-      el('div', { class: 'kaart-binnen' }, [
-        el('p', { tekst: 'In beide links zit je sleutel verwerkt — anders kan haar telefoon niets opslaan. Wie zo\'n link heeft, kan bij de Gists van dit account. Deel ze dus alleen met haar, en gebruik een sleutel die alleen Gists mag.' }),
-        el('p', { class: 'hulp', tekst: 'Lekt een link? Trek de sleutel in bij GitHub, maak een nieuwe en richt deze pagina opnieuw in. De Gists blijven gewoon bestaan; koppel ze via "bestaande Gists gebruiken".' }),
-        el('div', { class: 'knoppenrij' }, [
-          el('button', {
-            class: 'knop klein gevaar', tekst: 'Sleutel van dit apparaat wissen',
-            onclick: () => { vergeetToegang(); location.reload(); },
-          }),
+    test
+      ? el('div', { class: 'kaart' }, [
+        el('div', { class: 'kaart-kop' }, [el('h3', { tekst: 'Over de testmodus' })]),
+        el('div', { class: 'kaart-binnen' }, [
+          el('p', { tekst: 'Alles wat je doet blijft in deze browser en gaat nergens heen. De app werkt verder precies hetzelfde — dezelfde wachtrij, dezelfde manier van samenvoegen.' }),
+          el('p', { class: 'hulp', tekst: 'Klaar met kijken? Wis de testgegevens en vul daarna je sleutel in om echt te beginnen.' }),
+          el('div', { class: 'knoppenrij' }, [
+            el('button', { class: 'knop gevaar', tekst: 'Testmodus verlaten en gegevens wissen', onclick: verlaatTestmodus }),
+          ]),
+        ]),
+      ])
+      : el('div', { class: 'kaart' }, [
+        el('div', { class: 'kaart-kop' }, [el('h3', { tekst: 'Waar je op moet letten' })]),
+        el('div', { class: 'kaart-binnen' }, [
+          el('p', { tekst: 'In beide links zit je sleutel verwerkt — anders kan haar telefoon niets opslaan. Wie zo\'n link heeft, kan bij de Gists van dit account. Deel ze dus alleen met haar, en gebruik een sleutel die alleen Gists mag.' }),
+          el('p', { class: 'hulp', tekst: 'Lekt een link? Trek de sleutel in bij GitHub, maak een nieuwe en richt deze pagina opnieuw in. De Gists blijven gewoon bestaan; koppel ze via "bestaande Gists gebruiken".' }),
+          el('div', { class: 'knoppenrij' }, [
+            el('button', {
+              class: 'knop klein gevaar', tekst: 'Sleutel van dit apparaat wissen',
+              onclick: () => { vergeetToegang(); location.reload(); },
+            }),
+          ]),
         ]),
       ]),
-    ]),
   );
 }
 
-function linkKaart({ titel, uitleg, link, knopTekst }) {
+function verlaatTestmodus() {
+  new LokaleBron('data').wis();
+  new LokaleBron('fotos').wis();
+  for (const sleutel of Object.keys(localStorage)) {
+    if (sleutel.startsWith('schoonmaak.wachtrij.test') || sleutel === 'schoonmaak.doc.test') {
+      localStorage.removeItem(sleutel);
+    }
+  }
+  vergeetToegang();
+  location.reload();
+}
+
+function linkKaart({ titel, uitleg, link, knopTekst, toonLink = true }) {
   const veld = el('input', { type: 'text', readonly: true, value: link, onclick: (e) => e.target.select() });
   return el('div', { class: 'kaart' }, [
     el('div', { class: 'kaart-kop' }, [el('h2', { tekst: titel })]),
     el('div', { class: 'kaart-binnen' }, [
       el('p', { class: 'hulp', tekst: uitleg }),
-      veld,
+      toonLink ? veld : null,
       el('div', { class: 'knoppenrij', stijl: { marginTop: '10px' } }, [
-        el('button', {
+        toonLink ? el('button', {
           class: 'knop primair', tekst: '📋 Link kopiëren',
           onclick: async () => {
             try {
@@ -201,12 +253,12 @@ function linkKaart({ titel, uitleg, link, knopTekst }) {
               meld('Kopieer de geselecteerde link met Ctrl+C', 'fout', { duur: 4000 });
             }
           },
-        }),
-        navigator.share ? el('button', {
+        }) : null,
+        toonLink && navigator.share ? el('button', {
           class: 'knop', tekst: '↗ Delen',
           onclick: () => navigator.share({ title: 'Schoonmaak', url: link }).catch(() => {}),
         }) : null,
-        el('a', { class: 'knop', href: link, tekst: knopTekst }),
+        el('a', { class: `knop${toonLink ? '' : ' primair'}`, href: link, tekst: knopTekst }),
       ]),
     ]),
   ]);

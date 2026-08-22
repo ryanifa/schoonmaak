@@ -19,13 +19,15 @@ function uitBase64url(tekst) {
 export function maakLink(basisUrl, rol, toegang) {
   const map = new URL('.', basisUrl).href; // de map waarin de app staat
   const pagina = rol === 'beheerder' ? 'beheer.html' : 'schoonmaak.html';
-  const inhoud = naarBase64url(JSON.stringify({
-    s: toegang.sleutel,
-    d: toegang.dataGist,
-    f: toegang.fotoGist,
-    g: toegang.gebruiker || undefined,
-    r: rol,
-  }));
+  const inhoud = naarBase64url(JSON.stringify(toegang.test
+    ? { x: 1, r: rol }
+    : {
+      s: toegang.sleutel,
+      d: toegang.dataGist,
+      f: toegang.fotoGist,
+      g: toegang.gebruiker || undefined,
+      r: rol,
+    }));
   return `${map}${pagina}#c=${inhoud}`;
 }
 
@@ -37,13 +39,16 @@ function leesUitHash() {
   if (!c) return null;
   try {
     const rauw = JSON.parse(uitBase64url(c));
+    const rol = rauw.r === 'beheerder' ? 'beheerder' : 'schoonmaakster';
+    if (rauw.x) return { test: true, sleutel: null, dataGist: null, fotoGist: null, gebruiker: null, rol };
     if (!rauw.s || !rauw.d) return null;
     return {
+      test: false,
       sleutel: rauw.s,
       dataGist: rauw.d,
       fotoGist: rauw.f || null,
       gebruiker: rauw.g || null,
-      rol: rauw.r === 'beheerder' ? 'beheerder' : 'schoonmaakster',
+      rol,
     };
   } catch {
     return null;
@@ -55,6 +60,7 @@ function leesUitOpslag() {
     const rauw = localStorage.getItem(OPSLAG_SLEUTEL);
     if (!rauw) return null;
     const bewaard = JSON.parse(rauw);
+    if (bewaard?.test) return bewaard;
     return bewaard?.sleutel && bewaard?.dataGist ? bewaard : null;
   } catch {
     return null;
@@ -89,6 +95,11 @@ export function haalToegang(verwachteRol) {
   }
   const bewaard = leesUitOpslag();
   return bewaard ? { ...bewaard, rol: verwachteRol } : null;
+}
+
+/** Toegang voor de testmodus: alles blijft in deze browser. */
+export function testToegang(rol) {
+  return { test: true, sleutel: null, dataGist: null, fotoGist: null, gebruiker: null, rol };
 }
 
 export { naarBase64url, uitBase64url };

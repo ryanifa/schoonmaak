@@ -8,8 +8,9 @@ import { toonFoto } from './fotoscherm.js';
 import { toonModaal } from './modaal.js';
 import { meld } from './melding.js';
 import {
-  weekOverzicht, weekSleutel, nieuwId,
+  weekOverzicht, weekSleutel, nieuwId, lopendBezoek, gewerkteMinuten, vergetenBezoeken, alsDuur,
 } from './document.js';
+import { toonTestbalkIndienNodig } from './testbanner.js';
 import { huidigeWeek } from './week.js';
 import {
   el, leeg, voegToe, $, weekTitel, tijdstempel, meervoud, vinkIcoon,
@@ -24,6 +25,7 @@ let overzicht = null;
 async function begin() {
   if (!toegang) return toonGeenToegang();
 
+  toonTestbalkIndienNodig(toegang);
   opslag = new Opslag(toegang);
   fotos = new FotoOpslag(toegang);
   volgOpslag(opslag);
@@ -93,6 +95,7 @@ function teken() {
     ]));
   }
 
+  tekenWerkblok();
   tekenVoortgang(voortgang);
 
   const lijst = leeg($('#lijst'));
@@ -117,6 +120,118 @@ function teken() {
 
   tekenKlaarMelding(voortgang);
   tekenBerichten();
+}
+
+/* --------------------------------------------------------- starten en klaar */
+
+let klokTimer = null;
+
+function tekenWerkblok() {
+  const doel = leeg($('#werk'));
+  const week = overzicht.week;
+  const lopend = lopendBezoek(week);
+  const vergeten = vergetenBezoeken(week);
+  const minuten = gewerkteMinuten(week);
+
+  clearInterval(klokTimer);
+
+  if (lopend) {
+    const sinds = new Date(lopend.gestartOp);
+    const klok = el('div', { class: 'klok', tekst: minuten < 1 ? 'net begonnen' : alsDuur(minuten) });
+    doel.append(el('div', { class: 'werkblok bezig' }, [
+      klok,
+      el('div', {
+        class: 'sinds',
+        tekst: `bezig sinds ${sinds.getHours()}:${String(sinds.getMinutes()).padStart(2, '0')}`,
+      }),
+      el('button', { class: 'knop primair vol', type: 'button', tekst: '✓ Ik ben klaar', onclick: meldKlaar }),
+    ]));
+    // De klok loopt door zolang deze weergave in beeld is.
+    klokTimer = setInterval(() => {
+      const gelopen = gewerkteMinuten(overzicht.week);
+      klok.textContent = gelopen < 1 ? 'net begonnen' : alsDuur(gelopen);
+    }, 20000);
+    return;
+  }
+
+  // Of ze al gewerkt heeft, hangt af van afgeronde bezoeken — niet van de
+  // opgetelde minuten. Anders zou een korte beurt spoorloos verdwijnen.
+  const afgerond = (week.bezoeken || []).filter((b) => b.gestoptOp);
+
+  doel.append(el('div', { class: 'werkblok' }, [
+    afgerond.length
+      ? el('div', { class: 'klok', tekst: alsDuur(minuten) })
+      : null,
+    el('div', {
+      class: 'sinds',
+      tekst: afgerond.length
+        ? `gewerkt deze week${afgerond.length > 1 ? ` · ${afgerond.length} keer` : ''}`
+        : 'Tik hier als je begint, dan loopt de tijd mee.',
+    }),
+    el('button', {
+      class: `knop ${afgerond.length ? '' : 'primair '}vol`.trim(),
+      type: 'button',
+      tekst: afgerond.length ? '▶ Opnieuw beginnen' : '▶ Ik begin',
+      onclick: startWerk,
+    }),
+    vergeten.length
+      ? el('p', { class: 'hulp', tekst: 'Een eerdere keer is niet afgesloten. Die tijd is niet meegeteld.' })
+      : null,
+  ]));
+}
+
+function startWerk() {
+  if (navigator.vibrate) navigator.vibrate(15);
+  opslag.doe({
+    soort: 'bezoek.start',
+    week: huidigeWeekSleutel(),
+    id: nieuwId('bz'),
+    tijd: new Date().toISOString(),
+  });
+}
+
+function meldKlaar() {
+  const week = overzicht.week;
+  const lopend = lopendBezoek(week);
+  if (!lopend) return;
+  const { gedaan, totaal } = overzicht.voortgang;
+  const minuten = gewerkteMinuten(week);
+  const alles = totaal > 0 && gedaan === totaal;
+
+  const modaal = toonModaal({
+    titel: 'Klaar voor vandaag?',
+    inhoud: [
+      el('div', { stijl: { textAlign: 'center', padding: '4px 0 12px' } }, [
+        el('div', { class: 'klok', tekst: alsDuur(minuten) }),
+        el('div', { class: 'stil klein', tekst: 'gewerkt' }),
+      ]),
+      el('p', {
+        tekst: totaal
+          ? `Je hebt ${gedaan} van de ${totaal} taken afgevinkt.`
+          : 'Er stonden deze week geen taken op de lijst.',
+      }),
+      !alles && totaal
+        ? el('p', { class: 'hulp', tekst: 'Niet alles hoeft af — wat blijft staan, ziet de beheerder gewoon terug.' })
+        : null,
+    ],
+    knoppen: [
+      { tekst: 'Nog niet', bij: () => modaal.sluit() },
+      {
+        tekst: 'Ja, ik ben klaar', primair: true,
+        bij: () => {
+          opslag.doe({
+            soort: 'bezoek.stop',
+            week: huidigeWeekSleutel(),
+            id: lopend.id,
+            tijd: new Date().toISOString(),
+          });
+          if (navigator.vibrate) navigator.vibrate([10, 40, 10]);
+          meld('Bedankt! Tijd genoteerd.', 'goed', { duur: 3000 });
+          modaal.sluit();
+        },
+      },
+    ],
+  });
 }
 
 function tekenVoortgang({ gedaan, totaal }) {

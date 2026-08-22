@@ -3,7 +3,8 @@
    verse Gist-inhoud, zodat wijzigingen van de telefoon en de laptop niet van
    elkaar verloren gaan. */
 
-import { haalGist, schrijfGist, GistFout } from './gist.js';
+import { GistFout } from './gist.js';
+import { bronVoor } from './bron.js';
 import { leegDocument, speelAf, geraakteDelen, DOCUMENT_VERSIE } from './document.js';
 
 const BESTANDEN = {
@@ -56,9 +57,10 @@ export class Opslag extends EventTarget {
   /**
    * @param {{sleutel: string, dataGist: string, rol: string}} toegang
    */
-  constructor(toegang, { nu = () => new Date().toISOString() } = {}) {
+  constructor(toegang, { nu = () => new Date().toISOString(), bron = null } = {}) {
     super();
     this.toegang = toegang;
+    this.bron = bron || bronVoor(toegang, 'data');
     this.nu = nu;
     this.serverDoc = leegDocument();
     this.etag = null;
@@ -71,7 +73,7 @@ export class Opslag extends EventTarget {
   }
 
   get wachtrijSleutel() {
-    return `schoonmaak.wachtrij.${this.toegang.dataGist}.${this.toegang.rol}`;
+    return `schoonmaak.wachtrij.${this.toegang.dataGist || 'test'}.${this.toegang.rol}`;
   }
 
   /** Het document zoals het er nú uitziet: server plus wat nog verstuurd moet worden. */
@@ -98,14 +100,14 @@ export class Opslag extends EventTarget {
   /** Bewaart het laatst bekende document, zodat de app offline meteen iets kan tonen. */
   bewaarMomentopname() {
     try {
-      localStorage.setItem(`schoonmaak.doc.${this.toegang.dataGist}`,
+      localStorage.setItem(`schoonmaak.doc.${this.toegang.dataGist || 'test'}`,
         JSON.stringify({ doc: this.serverDoc, etag: this.etag }));
     } catch { /* te groot: dan alleen online */ }
   }
 
   laadMomentopname() {
     try {
-      const rauw = localStorage.getItem(`schoonmaak.doc.${this.toegang.dataGist}`);
+      const rauw = localStorage.getItem(`schoonmaak.doc.${this.toegang.dataGist || 'test'}`);
       if (!rauw) return false;
       const { doc, etag } = JSON.parse(rauw);
       if (!doc) return false;
@@ -147,7 +149,7 @@ export class Opslag extends EventTarget {
 
   /** Haalt de nieuwste stand op. Ongewijzigd? Dan kost dat geen quotum. */
   async ververs({ geforceerd = false } = {}) {
-    const antwoord = await haalGist(this.toegang.sleutel, this.toegang.dataGist, geforceerd ? null : this.etag);
+    const antwoord = await this.bron.haal(geforceerd ? null : this.etag);
     if (antwoord.ongewijzigd) return false;
     this.serverDoc = bestandenNaarDocument(antwoord.bestanden);
     this.etag = antwoord.etag;
@@ -242,7 +244,7 @@ export class Opslag extends EventTarget {
     let laatste = null;
 
     for (let poging = 0; poging < maxPogingen; poging++) {
-      const vers = await haalGist(this.toegang.sleutel, this.toegang.dataGist, null);
+      const vers = await this.bron.haal(null);
       const basis = bestandenNaarDocument(vers.bestanden);
       const nieuw = speelAf(basis, bewerkingen);
       laatste = nieuw;
@@ -255,11 +257,11 @@ export class Opslag extends EventTarget {
         return nieuw;
       }
 
-      const { etag } = await schrijfGist(this.toegang.sleutel, this.toegang.dataGist, erna);
+      const { etag } = await this.bron.schrijf(erna);
       this.etag = etag || null;
 
       // Ongewijzigd sinds ons eigen schrijven? Dan is niemand ertussen gekomen.
-      const controle = await haalGist(this.toegang.sleutel, this.toegang.dataGist, this.etag);
+      const controle = await this.bron.haal(this.etag);
       if (controle.ongewijzigd) return nieuw;
     }
     return laatste;

@@ -117,6 +117,26 @@ export function pasToe(doc, bewerking) {
       };
       break;
     }
+    case 'bezoek.start': {
+      const week = zorgVoorWeek(d, bewerking.week);
+      const bezoeken = week.bezoeken || [];
+      // Idempotent: hetzelfde bezoek nog eens starten verandert niets.
+      const nieuw = bezoeken.some((b) => b.id === bewerking.id)
+        ? bezoeken.map((b) => (b.id === bewerking.id ? { ...b, gestartOp: bewerking.tijd } : b))
+        : [...bezoeken, { id: bewerking.id, gestartOp: bewerking.tijd, gestoptOp: null }];
+      d.weken[bewerking.week] = { ...week, bezoeken: nieuw };
+      break;
+    }
+    case 'bezoek.stop': {
+      const week = zorgVoorWeek(d, bewerking.week);
+      const bezoeken = week.bezoeken || [];
+      if (!bezoeken.some((b) => b.id === bewerking.id)) break;
+      d.weken[bewerking.week] = {
+        ...week,
+        bezoeken: bezoeken.map((b) => (b.id === bewerking.id ? { ...b, gestoptOp: bewerking.tijd } : b)),
+      };
+      break;
+    }
     case 'bericht.maak': {
       if (d.berichten.some((b) => b.id === bewerking.bericht.id)) break;
       d.berichten = [bewerking.bericht, ...d.berichten].slice(0, 500);
@@ -150,13 +170,16 @@ function zorgVoorWeek(d, sleutel) {
     startdatum: alsDatumTekst(startdatumVanWeek(jaar, weeknummer)),
     notitie: '',
     taken: {},
+    bezoeken: [],
   };
 }
 
 /** Welke bestanden raakt deze bewerking? Bepaalt wat er weggeschreven wordt. */
 export function geraakteDelen(bewerking) {
   if (bewerking.soort.startsWith('ruimte.') || bewerking.soort.startsWith('taak.')) return ['bibliotheek'];
-  if (bewerking.soort.startsWith('week') || bewerking.soort.startsWith('weektaak.')) return ['weken'];
+  if (bewerking.soort.startsWith('week')
+    || bewerking.soort.startsWith('weektaak.')
+    || bewerking.soort.startsWith('bezoek.')) return ['weken'];
   return ['berichten'];
 }
 
@@ -188,7 +211,57 @@ export function haalWeek(doc, jaar, weeknummer) {
     startdatum: week?.startdatum || alsDatumTekst(startdatumVanWeek(jaar, weeknummer)),
     notitie: week?.notitie || '',
     taken: week?.taken || {},
+    bezoeken: week?.bezoeken || [],
   };
+}
+
+/* ------------------------------------------------------------------ bezoeken */
+
+/** Het bezoek dat nu bezig is: wel gestart, nog niet afgerond. */
+export function lopendBezoek(week) {
+  return (week.bezoeken || []).find((b) => b.gestartOp && !b.gestoptOp) || null;
+}
+
+/**
+ * Gewerkte minuten in een week. Een bezoek dat nog loopt telt mee tot `nu`.
+ * Bezoeken zonder eindtijd van een eerdere dag laten we buiten beschouwing —
+ * dan is er vergeten op "klaar" te tikken, en een telling van uren zou onzin zijn.
+ */
+export function gewerkteMinuten(week, nu = new Date()) {
+  let totaal = 0;
+  for (const bezoek of week.bezoeken || []) {
+    if (!bezoek.gestartOp) continue;
+    const start = new Date(bezoek.gestartOp);
+    if (Number.isNaN(start.getTime())) continue;
+    if (bezoek.gestoptOp) {
+      const eind = new Date(bezoek.gestoptOp);
+      if (!Number.isNaN(eind.getTime()) && eind > start) totaal += (eind - start) / 60000;
+    } else if (zelfdeDag(start, nu) && nu > start) {
+      totaal += (nu - start) / 60000;
+    }
+  }
+  return Math.round(totaal);
+}
+
+/** Bezoeken die nooit zijn afgesloten en van een eerdere dag zijn. */
+export function vergetenBezoeken(week, nu = new Date()) {
+  return (week.bezoeken || []).filter(
+    (b) => b.gestartOp && !b.gestoptOp && !zelfdeDag(new Date(b.gestartOp), nu),
+  );
+}
+
+function zelfdeDag(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+/** "1 uur 45" / "35 min" */
+export function alsDuur(minuten) {
+  if (!minuten) return '0 min';
+  const uren = Math.floor(minuten / 60);
+  const rest = minuten % 60;
+  if (!uren) return `${rest} min`;
+  if (!rest) return uren === 1 ? '1 uur' : `${uren} uur`;
+  return `${uren} uur ${String(rest).padStart(2, '0')}`;
 }
 
 /** De weeklijst zoals de schoonmaakster hem ziet: per ruimte, in volgorde. */
@@ -220,6 +293,7 @@ export function weekOverzicht(doc, jaar, weeknummer) {
     regels,
     voortgang: { gedaan, totaal: regels.length },
     berichten: (doc.berichten || []).filter((b) => b.week === week.sleutel),
+    bezoeken: week.bezoeken,
     onbekend: perTaak.size === 0,
   };
 }
@@ -296,9 +370,11 @@ export function historie(doc, limiet = 12) {
         notitie: week.notitie || '',
         gepland: standen.length,
         afgevinkt: standen.filter((s) => s.afgevinkt).length,
+        bezoeken: week.bezoeken || [],
+        gewerkteMinuten: gewerkteMinuten(week),
       };
     })
-    .filter((w) => w.gepland > 0 || w.notitie)
+    .filter((w) => w.gepland > 0 || w.notitie || w.bezoeken.length)
     .sort((a, b) => b.startdatum.localeCompare(a.startdatum))
     .slice(0, limiet);
 }

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   leegDocument, pasToe, speelAf, weekSleutel, nieuwId, weekOverzicht, weekSamensteller,
   historie, taakHistorie, alleOpmerkingen, aantalOngelezen, takenVanVorigeWeek,
-  ruimteLijst, taakLijst, laatstGedaan,
+  ruimteLijst, taakLijst, laatstGedaan, haalWeek,
+  lopendBezoek, gewerkteMinuten, vergetenBezoeken, alsDuur,
 } from '../app/js/document.js';
 import { maakVoorbeeldDocument } from '../app/js/seed.js';
 
@@ -213,4 +214,95 @@ test('een week zonder taken geeft een bruikbaar leeg overzicht', () => {
   assert.deepEqual(overzicht.groepen, []);
   assert.equal(overzicht.week.startdatum, '2030-01-28');
   assert.equal(overzicht.week.notitie, '');
+});
+
+/* ------------------------------------------------- starten en klaar melden */
+
+test('starten en klaar melden legt de gewerkte tijd vast', () => {
+  let doc = leegDocument();
+  doc = pasToe(doc, { soort: 'bezoek.start', week: W34, id: 'v1', tijd: '2026-08-18T09:00:00' });
+  const tussentijds = weekOverzicht(doc, 2026, 34);
+  assert.equal(tussentijds.bezoeken.length, 1);
+  assert.ok(lopendBezoek(tussentijds.week), 'het bezoek loopt nog');
+
+  doc = pasToe(doc, { soort: 'bezoek.stop', week: W34, id: 'v1', tijd: '2026-08-18T11:30:00' });
+  const week = haalWeek(doc, 2026, 34);
+  assert.equal(lopendBezoek(week), null);
+  assert.equal(gewerkteMinuten(week), 150);
+  assert.equal(alsDuur(150), '2 uur 30');
+});
+
+test('twee keer op start tikken maakt geen tweede bezoek', () => {
+  let doc = leegDocument();
+  const start = { soort: 'bezoek.start', week: W34, id: 'v1', tijd: '2026-08-18T09:00:00' };
+  doc = pasToe(doc, start);
+  doc = pasToe(doc, start);
+  assert.equal(haalWeek(doc, 2026, 34).bezoeken.length, 1);
+});
+
+test('meerdere bezoeken in een week tellen bij elkaar op', () => {
+  let doc = leegDocument();
+  for (const [id, van, tot] of [
+    ['v1', '2026-08-18T09:00:00', '2026-08-18T10:00:00'],
+    ['v2', '2026-08-20T13:00:00', '2026-08-20T14:45:00'],
+  ]) {
+    doc = pasToe(doc, { soort: 'bezoek.start', week: W34, id, tijd: van });
+    doc = pasToe(doc, { soort: 'bezoek.stop', week: W34, id, tijd: tot });
+  }
+  assert.equal(gewerkteMinuten(haalWeek(doc, 2026, 34)), 165);
+});
+
+test('een bezoek dat nog loopt telt mee tot nu', () => {
+  const nu = new Date('2026-08-18T11:00:00');
+  let doc = leegDocument();
+  doc = pasToe(doc, { soort: 'bezoek.start', week: W34, id: 'v1', tijd: '2026-08-18T09:30:00' });
+  assert.equal(gewerkteMinuten(haalWeek(doc, 2026, 34), nu), 90);
+});
+
+test('een vergeten bezoek van een eerdere dag telt niet mee', () => {
+  const nu = new Date('2026-08-20T11:00:00');
+  let doc = leegDocument();
+  doc = pasToe(doc, { soort: 'bezoek.start', week: W34, id: 'v1', tijd: '2026-08-18T09:00:00' });
+  const week = haalWeek(doc, 2026, 34);
+  assert.equal(gewerkteMinuten(week, nu), 0, 'anders zou er een absurd aantal uren staan');
+  assert.equal(vergetenBezoeken(week, nu).length, 1, 'maar het wordt wel gemeld');
+});
+
+test('stoppen zonder start doet niets', () => {
+  const doc = pasToe(leegDocument(), { soort: 'bezoek.stop', week: W34, id: 'onbekend', tijd: 't' });
+  assert.deepEqual(haalWeek(doc, 2026, 34).bezoeken, []);
+});
+
+test('bezoeken zijn ook veilig om opnieuw af te spelen', () => {
+  const bewerkingen = [
+    { soort: 'bezoek.start', week: W34, id: 'v1', tijd: '2026-08-18T09:00:00' },
+    { soort: 'bezoek.stop', week: W34, id: 'v1', tijd: '2026-08-18T11:00:00' },
+  ];
+  const eenmaal = speelAf(leegDocument(), bewerkingen);
+  assert.deepEqual(speelAf(eenmaal, bewerkingen), eenmaal);
+});
+
+test('de historie toont de gewerkte tijd per week', () => {
+  let doc = maakVoorbeeldDocument();
+  doc = metWeek(doc, W33, [doc.taken[0].id]);
+  doc = pasToe(doc, { soort: 'bezoek.start', week: W33, id: 'v1', tijd: '2026-08-11T09:00:00' });
+  doc = pasToe(doc, { soort: 'bezoek.stop', week: W33, id: 'v1', tijd: '2026-08-11T12:15:00' });
+  const w33 = historie(doc).find((w) => w.weeknummer === 33);
+  assert.equal(w33.gewerkteMinuten, 195);
+  assert.equal(alsDuur(w33.gewerkteMinuten), '3 uur 15');
+});
+
+test('een week met alleen een bezoek verschijnt toch in de historie', () => {
+  let doc = leegDocument();
+  doc = pasToe(doc, { soort: 'bezoek.start', week: W33, id: 'v1', tijd: '2026-08-11T09:00:00' });
+  doc = pasToe(doc, { soort: 'bezoek.stop', week: W33, id: 'v1', tijd: '2026-08-11T10:00:00' });
+  assert.equal(historie(doc).length, 1);
+});
+
+test('alsDuur schrijft tijden uit zoals je ze zegt', () => {
+  assert.equal(alsDuur(0), '0 min');
+  assert.equal(alsDuur(45), '45 min');
+  assert.equal(alsDuur(60), '1 uur');
+  assert.equal(alsDuur(125), '2 uur 05');
+  assert.equal(alsDuur(180), '3 uur');
 });
