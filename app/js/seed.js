@@ -1,78 +1,99 @@
-/* Voorbeeldbibliotheek voor een rijtjeshuis. Wordt eenmalig gebruikt bij het
-   inrichten; daarna schaaf je hem bij in de beheerdersweergave. */
+/* De takenbibliotheek van dit huis: een eengezinswoning over drie woonlagen
+   plus dakkamer. Wordt eenmalig gebruikt bij het inrichten; daarna schaaf je
+   hem bij in de beheerdersweergave.
+
+   Volgorde van de ruimtes volgt een rondje door het huis: eerst beneden, dan de
+   trap op, en als laatste de dakkamer. */
 
 import { nieuwId } from './document.js';
 
 const RUIMTES = [
   'Keuken',
   'Woonkamer',
-  'Hal',
-  'Toilet',
-  'Trap',
+  'Hal en trap',
+  'Overloop',
   'Badkamer',
-  'Slaapkamer voor',
-  'Slaapkamer achter',
-  'Algemeen',
+  'Sportkamer',
+  'Studeerkamer',
+  'Slaapkamer',
+  'Trap naar dakkamer',
+  'Dakkamer',
 ];
 
 const W = 'wekelijks';
-const TW = 'tweewekelijks';
-const M = 'maandelijks';
-const I = 'incidenteel';
+const P = 'periodiek';
+const N = 'indien_nodig';
 
+// Laminaat verdraagt geen natte mop. Deze zin staat bij elke laminaatvloer.
+const LAMINAAT = 'Laminaat alleen nevelvochtig dweilen: mop goed uitwringen, er mag geen water op blijven staan.';
+
+// [ruimte, titel, type, omschrijving, minuten, frequentiehint (alleen bij periodiek)]
 const TAKEN = [
-  ['Keuken', 'Aanrecht en tegelwand', 'Alles van het aanrecht af, afnemen met allesreiniger, daarna droogwrijven. Ook de tegels achter het aanrecht — vooral bij het fornuis.', W, 10],
-  ['Keuken', 'Kookplaat en afzuigkap', 'Kookplaat ontvetten. Buitenkant afzuigkap afnemen; het filter hoeft alleen als het zichtbaar vet is.', W, 10],
-  ['Keuken', 'Spoelbak en kraan', 'Spoelbak schuren met schuurmiddel, kraan natrekken zodat hij glimt. Ook de afvoerrand.', W, 5],
-  ['Keuken', 'Buitenkant kastjes en handgrepen', 'Vochtig doekje met allesreiniger, met name rond de handgrepen en onder de bovenkastjes.', TW, 10],
-  ['Keuken', 'Koelkast van buiten', 'Deur en handgreep afnemen, vingerafdrukken weg.', TW, 5],
-  ['Keuken', 'Binnenkant magnetron en oven', 'Magnetron van binnen uitnemen, oven alleen de glasdeur tenzij er iets is overgekookt.', M, 15],
-  ['Keuken', 'Prullenbak schoonmaken', 'Zak eruit, bak van binnen en buiten afnemen, nieuwe zak erin.', W, 5],
-  ['Keuken', 'Vloer stofzuigen en dweilen', 'Eerst stofzuigen, ook onder de tafel en langs de plinten. Dweilen met een scheutje allesreiniger.', W, 10],
+  ['Keuken', 'Keuken opruimen', N,
+    'Vaat in de vaatwasser, spullen terug op hun plek, aanrecht leeg. Pas als het opgeruimd is, kun je goed schoonmaken.', 10],
+  ['Keuken', 'Aanrecht en werkbladen schoonmaken', W,
+    'Alles eraf, afnemen met allesreiniger en daarna droogwrijven. Ook de spatwand achter het aanrecht meenemen.', 10],
+  ['Keuken', 'Inductiekookplaat schoonmaken', W,
+    'Laat de plaat eerst afkoelen. Afnemen met een vochtige doek; ingebrande vlekken met de glasschraper. Geen schuurspons — dat maakt krassen op het glas.', 10],
+  ['Keuken', 'Vuilnisbakken legen', W,
+    'Zak eruit, bak van binnen en buiten afnemen, nieuwe zak erin.', 5],
+  ['Keuken', 'Keukenkastjes (fronten) schoonmaken', P,
+    'Vochtig doekje met allesreiniger, met name rond de handgrepen en aan de onderkant van de bovenkastjes.', 15, 'maandelijks'],
+  ['Keuken', 'Glas van de oven schoonmaken', P,
+    'Binnen- en buitenkant van het ovenglas. Ovenreiniger even laten intrekken en daarna goed naspoelen.', 15, 'maandelijks'],
 
-  ['Woonkamer', 'Stofvrij maken oppervlakken', 'Kast, tv-meubel, salontafel en vensterbanken. Spullen even optillen, niet eromheen poetsen.', W, 15],
-  ['Woonkamer', 'Stofzuigen inclusief onder de bank', 'Ook de hoeken en langs de plinten. Kussens even oplichten.', W, 15],
-  ['Woonkamer', 'Vloer dweilen', 'Na het stofzuigen, met een goed uitgewrongen mop. Niet te nat op de houten vloer.', W, 10],
-  ['Woonkamer', 'Bank en kussens opfrissen', 'Kruimels uit de naden zuigen met het smalle mondstuk, kussens opschudden.', TW, 10],
-  ['Woonkamer', 'Deuren en lichtknopjes', 'Vooral rond de klinken en de schakelaars — daar zitten de meeste vingers aan.', TW, 10],
-  ['Woonkamer', 'Ramen aan de binnenkant', 'Glasreiniger en een droge doek. Ook de vensterbank eronder.', M, 25],
-  ['Woonkamer', 'Planten afstoffen en water geven', 'Bladeren voorzichtig afnemen met een vochtig doekje.', TW, 10],
+  ['Woonkamer', 'Eettafel schoonmaken', W,
+    'Afnemen en droogwrijven. Ook de randen en de poten als daar kliederen op zitten.', 5],
+  ['Woonkamer', 'Planten water geven', W,
+    'Voelen of de aarde droog is; alleen water geven als dat zo is. Geen laagje water in de pot laten staan.', 10],
+  ['Woonkamer', 'Vloer keuken en woonkamer dweilen', W,
+    `Eerst stofzuigen, ook langs de plinten en onder de tafel. Keuken en woonkamer lopen in elkaar over: dit is één vloer. In de woonkamer ligt zeil, in het keukengedeelte laminaat. ${LAMINAAT}`, 20],
 
-  ['Hal', 'Vloer stofzuigen en dweilen', 'Ook onder de kapstok en de deurmat uitkloppen.', W, 10],
-  ['Hal', 'Voordeur en kozijn binnenkant', 'Deur, klink en brievenbus afnemen.', TW, 5],
-  ['Hal', 'Meterkastdeur en plinten', 'Stof en vegen weg.', M, 5],
+  ['Hal en trap', 'Gang stofzuigen en dweilen', W,
+    `Ook onder de kapstok, en de deurmat even uitkloppen. ${LAMINAAT}`, 10],
+  ['Hal en trap', 'Trap naar eerste verdieping stofzuigen', W,
+    'Met het smalle mondstuk, ook de hoekjes van de treden en de randen langs de muur.', 10],
 
-  ['Toilet', 'Pot van binnen en buiten', 'Toiletreiniger onder de rand, laten intrekken, daarna borstelen. Buitenkant, bril en scharnieren met een apart doekje.', W, 10],
-  ['Toilet', 'Fonteintje en kraan', 'Kalkaanslag met azijnreiniger.', W, 5],
-  ['Toilet', 'Vloer en tegels', 'Vooral achter en naast de pot goed meenemen.', W, 10],
-  ['Toilet', 'Toiletborstel vervangen of uitspoelen', 'Houder legen en omspoelen.', M, 5],
+  ['Overloop', 'Overloop stofzuigen en dweilen', W,
+    `Ook de hoeken en langs de plinten. ${LAMINAAT}`, 10],
 
-  ['Trap', 'Traptreden stofzuigen', 'Met het smalle mondstuk, ook de hoekjes van de treden.', W, 10],
-  ['Trap', 'Trapleuning en spijlen', 'Leuning afnemen met een vochtig doekje.', TW, 10],
+  ['Badkamer', 'Badkamer opruimen', N,
+    'Spullen terug in de kast, handdoeken op hun plek, wasgoed in de mand. Pas dan kun je goed schoonmaken.', 10],
+  ['Badkamer', 'Toilet schoonmaken', W,
+    'Toiletreiniger onder de rand, even laten intrekken en daarna borstelen. Bril, deksel, scharnieren en de buitenkant met een apart doekje.', 10],
+  ['Badkamer', 'Douche, wastafel en kranen schoonmaken', W,
+    'Kalkaanslag op de wand en de kranen met azijnreiniger; wand daarna droogtrekken met de trekker. Afvoerputje leeghalen (haren). Spiegel streeploos.', 20],
+  ['Badkamer', 'Vloer dweilen', W,
+    'Eerst stofzuigen. Vooral achter en naast het toilet en onder de wastafel goed meenemen.', 10],
 
-  ['Badkamer', 'Douchewand en tegels', 'Wand met glasreiniger of azijn tegen kalk, daarna droogtrekken met de trekker. Tegels tot schouderhoogte.', W, 15],
-  ['Badkamer', 'Douchebak en afvoer', 'Afvoerputje leeghalen (haren!) en schoonmaken.', W, 10],
-  ['Badkamer', 'Wastafel, kraan en spiegel', 'Kalk weg bij de kraan, spiegel streeploos.', W, 10],
-  ['Badkamer', 'Vloer en plinten', 'Stofzuigen en dweilen, ook achter de wc-borstel en onder de wastafel.', W, 10],
-  ['Badkamer', 'Handdoeken verschonen', 'Schone handdoeken uit de kast, gebruikte in de wasmand.', W, 5],
-  ['Badkamer', 'Voegen bijwerken tegen schimmel', 'Schimmelspray op de zwarte plekjes, 10 minuten laten staan, naspoelen.', M, 20],
-  ['Badkamer', 'Wasmachine rand en zeepbakje', 'Rubberen rand droogwrijven, zeepbakje uitspoelen.', M, 10],
+  ['Sportkamer', 'Sportkamer opruimen', N,
+    'Matten, gewichten en materiaal terug op hun plek, zodat de vloer vrij is.', 10],
+  ['Sportkamer', 'Vloer stofzuigen en dweilen', W,
+    `Ook onder en achter de toestellen. ${LAMINAAT}`, 10],
+  ['Sportkamer', 'Vensterbank schoonmaken', P,
+    'Spullen eraf, vochtig doekje, daarna droog. Ook de rand van het kozijn.', 10, 'maandelijks'],
 
-  ['Slaapkamer voor', 'Bed verschonen', 'Beddengoed ligt klaar in de kast. Oude lakens in de wasmand.', TW, 10],
-  ['Slaapkamer voor', 'Stofzuigen en stofvrij maken', 'Nachtkastjes, vensterbank en onder het bed.', W, 15],
-  ['Slaapkamer voor', 'Vloer dweilen', 'Alleen als de vloer zichtbaar vies is.', TW, 10],
-  ['Slaapkamer voor', 'Spiegel en kastdeuren', 'Vingerafdrukken van de kastdeuren.', M, 10],
+  ['Studeerkamer', 'Vloer stofzuigen en dweilen', W,
+    `Ook onder het bureau en achter de deur. ${LAMINAAT}`, 10],
+  ['Studeerkamer', 'Kastjes afstoffen', P,
+    'Bovenkant en fronten van de kastjes. Niets verplaatsen wat er niet af hoeft.', 10, 'maandelijks'],
 
-  ['Slaapkamer achter', 'Bed verschonen', 'Beddengoed ligt klaar in de kast.', TW, 10],
-  ['Slaapkamer achter', 'Stofzuigen en stofvrij maken', 'Ook onder het bureau en achter de deur.', W, 15],
-  ['Slaapkamer achter', 'Bureau opgeruimd afnemen', 'Niets weggooien, alleen stof en kringen weg.', TW, 5],
+  ['Slaapkamer', 'Bed opmaken', N,
+    'Dekbed opschudden en rechtleggen, kussens goed. Alleen als het nog niet gedaan is.', 5],
+  ['Slaapkamer', 'Vloer stofzuigen en dweilen', W,
+    `Ook onder het bed en langs de plinten. ${LAMINAAT}`, 10],
 
-  ['Algemeen', 'Was draaien en ophangen', 'Wasmand in de badkamer. Programma staat op het kaartje bij de machine.', W, 15],
-  ['Algemeen', 'Plinten in het hele huis', 'Vochtig doekje langs de plinten, kamer voor kamer.', M, 30],
-  ['Algemeen', 'Deurposten en bovenkant deuren', 'Daar ligt het meeste stof en dat zie je pas in de zon.', M, 20],
-  ['Algemeen', 'Radiatoren stoffen', 'Met de smalle stofzuigermond tussen de ribben.', M, 15],
-  ['Algemeen', 'Ramen aan de buitenkant', 'Alleen de begane grond, en alleen als het weer het toelaat.', I, 40],
-  ['Algemeen', 'Gordijnen en vitrage wassen', 'In overleg — laat het even weten voordat je begint.', I, 30],
+  ['Trap naar dakkamer', 'Trap stofzuigen en dweilen', W,
+    `Met het smalle mondstuk, ook de hoekjes van de treden. ${LAMINAAT}`, 10],
+
+  ['Dakkamer', 'Keukentje opruimen', N,
+    'Vaat weg, aanrechtje leeg, spullen terug op hun plek.', 5],
+  ['Dakkamer', 'Keukentje schoonmaken', W,
+    'Aanrechtje en spoelbakje afnemen, kraan natrekken, kastdeurtjes bij de handgrepen.', 10],
+  ['Dakkamer', 'Vloer stofzuigen en dweilen', W,
+    `Ook de hoeken onder het schuine dak. ${LAMINAAT}`, 10],
+  ['Dakkamer', 'Plant water geven', W,
+    'Voelen of de aarde droog is; alleen dan water geven.', 5],
 ];
 
 /** Bouwt een compleet startdocument met ruimtes en taken. */
@@ -85,7 +106,7 @@ export function maakVoorbeeldDocument() {
   });
 
   const volgordePerRuimte = new Map();
-  const taken = TAKEN.map(([ruimte, titel, omschrijving, standaardFrequentie, geschatteMinuten]) => {
+  const taken = TAKEN.map(([ruimte, titel, type, omschrijving, geschatteMinuten, frequentie]) => {
     const volgorde = volgordePerRuimte.get(ruimte) ?? 0;
     volgordePerRuimte.set(ruimte, volgorde + 1);
     return {
@@ -93,9 +114,11 @@ export function maakVoorbeeldDocument() {
       titel,
       ruimteId: ruimteIds.get(ruimte),
       omschrijving,
-      fotoId: null,
-      standaardFrequentie,
+      type,
+      // De frequentie is alleen een hulpje bij periodieke taken.
+      standaardFrequentie: frequentie || (type === 'wekelijks' ? 'wekelijks' : 'incidenteel'),
       geschatteMinuten,
+      fotoId: null,
       volgorde,
       actief: true,
     };

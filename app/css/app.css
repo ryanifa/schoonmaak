@@ -160,6 +160,18 @@ a { color: var(--accent-donker); }
   display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   padding: 0 14px 12px 55px;
 }
+
+/* Opruimtaken: twee keuzes in plaats van één vinkje. */
+.taak-keuze { display: flex; gap: 8px; padding: 0 14px 10px; }
+.taak-keuze .knop { flex: 1; min-height: 46px; }
+.taak-keuze .knop.klein { flex: 0 0 auto; min-height: 38px; }
+
+.vink.vraag {
+  border-style: dashed;
+  color: var(--inkt-zacht);
+  font-weight: 700;
+  font-size: .95rem;
+}
 .opmerking-weergave {
   width: 100%; background: var(--waarschuwing-zacht); border-left: 3px solid var(--waarschuwing);
   border-radius: 0 var(--radius-klein) var(--radius-klein) 0;

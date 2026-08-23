@@ -104,12 +104,37 @@ zonder adresbalk, en ook zonder bereik.
 
 ## Wat er in de app zit
 
-**Beheer** — takenbibliotheek per ruimte met foto's, standaardfrequentie en
-tijdsinschatting; taken toevoegen, bewerken, herordenen en archiveren; ruimtes
-beheren. Week samenstellen met per taak **hoeveel weken geleden die voor het
+**Beheer** — takenbibliotheek per ruimte met foto's, type, tijdsinschatting en
+(bij periodieke taken) een frequentiehint; taken toevoegen, bewerken, herordenen
+en archiveren; ruimtes beheren. Week samenstellen met per taak **hoeveel weken geleden die voor het
 laatst gedaan is**, snelknoppen (kopieer vorige week, alles wekelijks, alles uit)
 en een notitieveld. Historie per week en per taak, plus alle opmerkingen en
 berichten met een ongelezen-markering.
+
+### Drie soorten taken
+
+Naast ruimte heeft elke taak een **type**, en dat bepaalt het gedrag:
+
+| Type | Gedrag |
+|---|---|
+| `wekelijks` | Staat standaard aan als je een week samenstelt |
+| `periodiek` | Zet je zelf aan als hij aan de beurt is; je ziet erbij hoelang geleden het is gedaan |
+| `indien_nodig` | Staat **altijd** op haar lijst — ook als je hem niet aanvinkt, en ook "alles uit" haalt hem er niet af |
+
+`indien_nodig` is voor opruimtaken. Normaal ruimt de bewoner zelf op, maar dat
+lukt niet altijd, en in een rommelige kamer valt niet schoon te maken. Zij moet
+dat dus zelf kunnen oppakken zonder te overleggen.
+
+Daarom heeft zo'n taak twee knoppen in plaats van een vinkje: **Was al in orde**
+en **Heb ik gedaan**. Allebei gelden als afgerond, maar het verschil blijft
+bewaard. In de historie zie je per taak hoe vaak het echt nodig was — bijvoorbeeld
+"in 7 weken: 4× al in orde, 2× door haar gedaan".
+
+> De spec noemde deze knoppen "Was al opgeruimd" en "Heb ik opgeruimd". Dat leest
+> raar bij *Bed opmaken*, dus ik heb het neutraler gemaakt. Andere woorden zijn
+> zo weer aangepast in `app/js/schoonmaak.js`.
+
+### Werktijd
 
 **Schoonmaak** — bovenaan een grote knop **Ik begin**; daarna loopt de tijd mee
 en staat er **Ik ben klaar**. Bij het afsluiten volgt een korte samenvatting:
@@ -168,6 +193,20 @@ blijven ze in IndexedDB staan en gaat er niets meer over de lijn. De browser
 verkleint een foto naar maximaal 1100 pixels voordat er iets verstuurd wordt; een
 kiekje van 4 MB wordt zo een bestand van enkele tientallen kilobytes.
 
+## Het huis
+
+Eengezinswoning over drie woonlagen plus dakkamer. Begane grond: open keuken die
+doorloopt in de woonkamer, hal en trap. Eerste verdieping: overloop, badkamer
+(met het enige toilet), sportkamer, studeerkamer, slaapkamer. Daarboven via een
+tweede trap de dakkamer met een klein keukentje.
+
+Overal laminaat, behalve de woonkamer — daar ligt zeil. **Laminaat mag alleen
+nevelvochtig gedweild worden**, dus die zin staat letterlijk in de omschrijving
+van elke dweiltaak op laminaat. Er is een test die dat bewaakt.
+
+De keuken en de woonkamer zijn één doorlopende ruimte; één vloertaak dekt ze
+allebei, met beide vloersoorten in de omschrijving.
+
 ## Hoe het in elkaar zit
 
 ```
@@ -199,14 +238,16 @@ testen en later uit te breiden.
 ## Testen
 
 ```bash
-npm test        # 52 tests
+npm test        # 67 tests
 npm run dev     # bekijk de app lokaal op http://localhost:4321
 ```
 
 De tests draaien ook bij elke push; publiceren gebeurt alleen als ze slagen.
 
 Wat ze afdekken: ISO-weeklogica inclusief jaren met 53 weken; alle bewerkingen op
-het datamodel, inclusief starten en klaar melden; en het synchroniseren tegen een
+het datamodel, inclusief starten, klaar melden en de opruimtaken (die er altijd
+bij staan, ook na "alles uit"); dat elke laminaatvloer de waarschuwing tegen nat
+dweilen draagt; en het synchroniseren tegen een
 **nagebouwde Gist-API** (`test/nep-gist.js`) — gelijktijdig werken op telefoon en
 laptop, een wachtrij die een herstart overleeft, offline openen, een verkeerde
 sleutel, een beschadigd bestand in de Gist, en dat foto's maar één keer worden

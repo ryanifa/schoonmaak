@@ -6,6 +6,27 @@
 import { startdatumVanWeek, alsDatumTekst, wekenTussen, huidigeWeek, vorigeWeek, volgendeWeek } from './week.js';
 
 export const FREQUENTIES = ['wekelijks', 'tweewekelijks', 'maandelijks', 'incidenteel'];
+
+/**
+ * Het type bepaalt hoe een taak zich in de app gedraagt:
+ *  - wekelijks     staat standaard aan in de weeklijst
+ *  - periodiek     de beheerder zet hem aan als hij aan de beurt is
+ *  - indien_nodig  staat altijd in de lijst; de schoonmaakster beoordeelt zelf
+ */
+export const TAAKTYPES = ['wekelijks', 'periodiek', 'indien_nodig'];
+export const TAAKTYPE_LABEL = {
+  wekelijks: 'wekelijks',
+  periodiek: 'periodiek',
+  indien_nodig: 'indien nodig',
+};
+
+/** Uitkomst van een indien_nodig-taak. */
+export const RESULTATEN = ['was_al_gedaan', 'zelf_gedaan'];
+export const RESULTAAT_LABEL = {
+  was_al_gedaan: 'was al in orde',
+  zelf_gedaan: 'heeft zij gedaan',
+};
+
 export const DOCUMENT_VERSIE = 1;
 
 export function leegDocument() {
@@ -83,7 +104,9 @@ export function pasToe(doc, bewerking) {
       const week = zorgVoorWeek(d, bewerking.week);
       const oud = week.taken || {};
       const nieuw = {};
-      for (const taakId of bewerking.taakIds) {
+      // Opruimtaken staan er altijd bij, ook als de beheerder ze niet aanvinkt.
+      const verplicht = altijdOpDeLijst(d).map((t) => t.id);
+      for (const taakId of [...new Set([...bewerking.taakIds, ...verplicht])]) {
         // Al afgevinkte taken houden hun stand als ze op de lijst blijven.
         nieuw[taakId] = oud[taakId] || { afgevinkt: false, afgevinktOp: null, opmerking: '' };
       }
@@ -92,7 +115,7 @@ export function pasToe(doc, bewerking) {
     }
     case 'weektaak.afvinken': {
       const week = zorgVoorWeek(d, bewerking.week);
-      const bestaand = week.taken?.[bewerking.taakId];
+      const bestaand = standVoor(d, week, bewerking.taakId);
       if (!bestaand) break; // taak staat niet (meer) op deze weeklijst
       d.weken[bewerking.week] = {
         ...week,
@@ -102,6 +125,27 @@ export function pasToe(doc, bewerking) {
             ...bestaand,
             afgevinkt: bewerking.afgevinkt,
             afgevinktOp: bewerking.afgevinkt ? bewerking.tijd : null,
+            resultaat: bewerking.afgevinkt ? (bestaand.resultaat ?? null) : null,
+          },
+        },
+      };
+      break;
+    }
+    case 'weektaak.resultaat': {
+      // Voor opruimtaken: wel of niet nodig geweest. Beide gelden als afgerond.
+      const week = zorgVoorWeek(d, bewerking.week);
+      const bestaand = standVoor(d, week, bewerking.taakId);
+      if (!bestaand) break;
+      const gekozen = RESULTATEN.includes(bewerking.resultaat) ? bewerking.resultaat : null;
+      d.weken[bewerking.week] = {
+        ...week,
+        taken: {
+          ...week.taken,
+          [bewerking.taakId]: {
+            ...bestaand,
+            resultaat: gekozen,
+            afgevinkt: gekozen !== null,
+            afgevinktOp: gekozen !== null ? bewerking.tijd : null,
           },
         },
       };
@@ -109,7 +153,7 @@ export function pasToe(doc, bewerking) {
     }
     case 'weektaak.opmerking': {
       const week = zorgVoorWeek(d, bewerking.week);
-      const bestaand = week.taken?.[bewerking.taakId];
+      const bestaand = standVoor(d, week, bewerking.taakId);
       if (!bestaand) break;
       d.weken[bewerking.week] = {
         ...week,
@@ -161,6 +205,19 @@ export function speelAf(doc, bewerkingen) {
   return bewerkingen.reduce((tussenstand, b) => pasToe(tussenstand, b), doc);
 }
 
+/**
+ * De stand van één taak in een week. Voor taken die altijd op de lijst horen
+ * maken we hem zo nodig alsnog aan — die kunnen ook zonder de beheerder afgerond
+ * worden, en een nieuw toegevoegde opruimtaak moet meteen bruikbaar zijn.
+ */
+function standVoor(d, week, taakId) {
+  const bestaand = week.taken?.[taakId];
+  if (bestaand) return bestaand;
+  const hoortErAltijdBij = altijdOpDeLijst(d).some((t) => t.id === taakId);
+  if (!hoortErAltijdBij) return null;
+  return { afgevinkt: false, afgevinktOp: null, opmerking: '', resultaat: null };
+}
+
 function zorgVoorWeek(d, sleutel) {
   const bestaand = d.weken[sleutel];
   if (bestaand) return bestaand;
@@ -185,6 +242,20 @@ export function geraakteDelen(bewerking) {
 
 /* ------------------------------------------------------------------ afleiden */
 
+/**
+ * Vult ontbrekende velden aan. Taken uit een oudere versie hebben nog geen
+ * `type`; dat leiden we af uit de frequentie, zodat niets omvalt.
+ */
+function metType(taak) {
+  if (TAAKTYPES.includes(taak.type)) return taak;
+  return { ...taak, type: taak.standaardFrequentie === 'wekelijks' ? 'wekelijks' : 'periodiek' };
+}
+
+/** Taken die altijd op de weeklijst horen te staan. */
+export function altijdOpDeLijst(doc) {
+  return (doc.taken || []).map(metType).filter((t) => t.actief && t.type === 'indien_nodig');
+}
+
 export function ruimteLijst(doc, { inclusiefGearchiveerd = false } = {}) {
   return (doc.ruimtes || [])
     .filter((r) => inclusiefGearchiveerd || r.actief)
@@ -195,6 +266,7 @@ export function taakLijst(doc, { inclusiefGearchiveerd = false } = {}) {
   const ruimtePlek = new Map(ruimteLijst(doc, { inclusiefGearchiveerd: true }).map((r, i) => [r.id, i]));
   const ruimteNaam = new Map((doc.ruimtes || []).map((r) => [r.id, r.naam]));
   return (doc.taken || [])
+    .map(metType)
     .filter((t) => inclusiefGearchiveerd || t.actief)
     .map((t) => ({ ...t, ruimteNaam: ruimteNaam.get(t.ruimteId) || 'Zonder ruimte' }))
     .sort((a, b) => (ruimtePlek.get(a.ruimteId) ?? 999) - (ruimtePlek.get(b.ruimteId) ?? 999)
@@ -268,21 +340,25 @@ export function alsDuur(minuten) {
 export function weekOverzicht(doc, jaar, weeknummer) {
   const week = haalWeek(doc, jaar, weeknummer);
   const perTaak = new Map(taakLijst(doc, { inclusiefGearchiveerd: true }).map((t) => [t.id, t]));
+  const altijd = new Set(altijdOpDeLijst(doc).map((t) => t.id));
   const regels = [];
   for (const taak of taakLijst(doc, { inclusiefGearchiveerd: true })) {
     const stand = week.taken[taak.id];
-    if (!stand) continue;
+    // Een opruimtaak hoort er ook bij als de beheerder hem nooit heeft aangezet.
+    if (!stand && !altijd.has(taak.id)) continue;
     regels.push({
       taakId: taak.id,
       titel: taak.titel,
       omschrijving: taak.omschrijving,
+      type: taak.type,
       fotoId: taak.fotoId || null,
       geschatteMinuten: taak.geschatteMinuten,
       ruimteId: taak.ruimteId,
       ruimteNaam: taak.ruimteNaam,
-      afgevinkt: !!stand.afgevinkt,
-      afgevinktOp: stand.afgevinktOp || null,
-      opmerking: stand.opmerking || '',
+      afgevinkt: !!stand?.afgevinkt,
+      afgevinktOp: stand?.afgevinktOp || null,
+      opmerking: stand?.opmerking || '',
+      resultaat: stand?.resultaat || null,
     });
   }
   // Taken die intussen uit de bibliotheek verdwenen zijn, laten we netjes vallen.
@@ -338,7 +414,9 @@ export function weekSamensteller(doc, jaar, weeknummer) {
     const info = laatst.get(taak.id);
     return {
       ...taak,
-      geselecteerd: Object.hasOwn(week.taken, taak.id),
+      // Opruimtaken staan altijd op de lijst; die kan de beheerder niet uitzetten.
+      vast: taak.type === 'indien_nodig',
+      geselecteerd: taak.type === 'indien_nodig' || Object.hasOwn(week.taken, taak.id),
       afgevinkt: !!week.taken[taak.id]?.afgevinkt,
       wekenGeleden: info ? info.wekenGeleden : null,
       laatsteStartdatum: info ? info.laatsteStartdatum : null,
@@ -390,6 +468,7 @@ export function taakHistorie(doc, taakId, limiet = 26) {
       afgevinkt: !!week.taken[taakId].afgevinkt,
       afgevinktOp: week.taken[taakId].afgevinktOp || null,
       opmerking: week.taken[taakId].opmerking || '',
+      resultaat: week.taken[taakId].resultaat || null,
     }))
     .sort((a, b) => b.startdatum.localeCompare(a.startdatum))
     .slice(0, limiet);
@@ -416,6 +495,22 @@ export function alleOpmerkingen(doc, limiet = 100) {
     }
   }
   return uit.sort((a, b) => b.startdatum.localeCompare(a.startdatum)).slice(0, limiet);
+}
+
+/**
+ * Hoe vaak een opruimtaak nodig was. Laat de beheerder zien of iets structureel
+ * blijft liggen, of juist bijna altijd al in orde is.
+ */
+export function resultaatTelling(doc, taakId) {
+  const telling = { was_al_gedaan: 0, zelf_gedaan: 0, open: 0, weken: 0 };
+  for (const week of Object.values(doc.weken || {})) {
+    const stand = week.taken?.[taakId];
+    if (!stand) continue;
+    telling.weken += 1;
+    if (stand.resultaat && Object.hasOwn(telling, stand.resultaat)) telling[stand.resultaat] += 1;
+    else if (!stand.afgevinkt) telling.open += 1;
+  }
+  return telling;
 }
 
 export function aantalOngelezen(doc, voorRol) {

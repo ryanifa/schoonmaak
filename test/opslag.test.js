@@ -78,7 +78,7 @@ test('gelijktijdig werken op telefoon en laptop gaat niet verloren', async () =>
   const overzicht = weekOverzicht(doc, 2026, 34);
   assert.equal(overzicht.week.notitie, 'Let op de vensterbanken', 'notitie van de laptop bewaard');
   assert.equal(overzicht.voortgang.gedaan, 1, 'afvinkje van de telefoon bewaard');
-  assert.equal(overzicht.voortgang.totaal, 3);
+  assert.ok(overzicht.regels.some((r) => r.taakId === taken[0] && r.afgevinkt));
 });
 
 test('twee afvinkjes tegelijk overschrijven elkaar niet', async () => {
@@ -122,7 +122,9 @@ test('een taak die tijdens het afvinken van de weeklijst wordt gehaald, geeft ge
   await telefoon.verstuur();
 
   const doc = await nieuweOpslag().begin();
-  assert.deepEqual(Object.keys(doc.weken[week].taken).sort(), [taken[0], taken[1]].sort());
+  const gekozen = Object.keys(doc.weken[week].taken);
+  assert.ok(gekozen.includes(taken[0]) && gekozen.includes(taken[1]));
+  assert.ok(!gekozen.includes(taken[2]), 'de weggehaalde taak staat er niet meer op');
   assert.equal(telefoon.wachtrij.length, 0, 'de wachtrij blijft niet hangen');
 });
 

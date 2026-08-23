@@ -19,8 +19,9 @@ export function maakTestDocument() {
   const nu = huidigeWeek();
   const bewerkingen = [];
 
-  const wekelijks = doc.taken.filter((t) => t.standaardFrequentie === 'wekelijks').map((t) => t.id);
-  const tweewekelijks = doc.taken.filter((t) => t.standaardFrequentie === 'tweewekelijks').map((t) => t.id);
+  const wekelijks = doc.taken.filter((t) => t.type === 'wekelijks').map((t) => t.id);
+  const periodiek = doc.taken.filter((t) => t.type === 'periodiek').map((t) => t.id);
+  const opruimen = doc.taken.filter((t) => t.type === 'indien_nodig').map((t) => t.id);
 
   // Zes weken historie, met wisselende resultaten en een gewerkte ochtend.
   let week = { jaar: nu.jaar, weeknummer: nu.weeknummer };
@@ -32,10 +33,20 @@ export function maakTestDocument() {
 
   eerdere.forEach((w, index) => {
     const sleutel = weekSleutel(w.jaar, w.weeknummer);
-    const taken = index % 2 === 0 ? [...wekelijks, ...tweewekelijks] : [...wekelijks];
+    // Om de week ook een periodieke taak erbij, zodat "hoelang geleden" iets laat zien.
+    const taken = index % 2 === 0 ? [...wekelijks, periodiek[index % periodiek.length]] : [...wekelijks];
     bewerkingen.push({ soort: 'week.taken', week: sleutel, taakIds: taken });
 
     // Bijna alles gedaan, maar niet alles — dat is realistischer dan 100%.
+    // Opruimtaken komen er vanzelf bij; die krijgen een resultaat in plaats van een vinkje.
+    opruimen.forEach((taakId, n) => {
+      bewerkingen.push({
+        soort: 'weektaak.resultaat', week: sleutel, taakId,
+        resultaat: (n + index) % 3 === 0 ? 'zelf_gedaan' : 'was_al_gedaan',
+        tijd: tijdIn(w.jaar, w.weeknummer, 1, 9, 5 + n),
+      });
+    });
+
     taken.forEach((taakId, n) => {
       if ((n + index) % 9 === 0) return;
       bewerkingen.push({
@@ -53,12 +64,12 @@ export function maakTestDocument() {
 
   // Deze week: gepland, notitie, en een paar dingen al gedaan.
   const dezeWeek = weekSleutel(nu.jaar, nu.weeknummer);
-  const ramen = doc.taken.find((t) => t.titel.includes('Ramen aan de binnenkant'));
-  const planning = [...wekelijks, ...(ramen ? [ramen.id] : [])];
+  const extra = doc.taken.find((t) => t.titel.includes('Vensterbank'));
+  const planning = [...wekelijks, ...(extra ? [extra.id] : [])];
   bewerkingen.push({ soort: 'week.taken', week: dezeWeek, taakIds: planning });
   bewerkingen.push({
     soort: 'week.notitie', week: dezeWeek,
-    notitie: 'Deze week graag extra aandacht voor de vensterbanken. De ramen in de woonkamer zijn al een tijd niet aan de beurt geweest.',
+    notitie: 'Deze week graag extra aandacht voor de vensterbanken in de sportkamer. Denk aan het laminaat: nevelvochtig dweilen, niet nat.',
   });
 
   planning.slice(0, 3).forEach((taakId, n) => {

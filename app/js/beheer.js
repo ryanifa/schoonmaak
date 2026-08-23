@@ -8,7 +8,8 @@ import { toonFoto } from './fotoscherm.js';
 import { toonModaal } from './modaal.js';
 import { meld } from './melding.js';
 import {
-  FREQUENTIES, weekSleutel, nieuwId, ruimteLijst, taakLijst, weekOverzicht,
+  FREQUENTIES, TAAKTYPES, TAAKTYPE_LABEL, RESULTAAT_LABEL, resultaatTelling,
+  weekSleutel, nieuwId, ruimteLijst, taakLijst, weekOverzicht,
   weekSamensteller, historie, taakHistorie, alleOpmerkingen, aantalOngelezen,
   takenVanVorigeWeek, lopendBezoek, gewerkteMinuten, alsDuur, haalWeek,
 } from './document.js';
@@ -233,28 +234,37 @@ function tekenWeek() {
 function tekenSamenstellerTaak(sam, alle, taak) {
   const laat = taak.wekenGeleden === null || taak.wekenGeleden >= 4;
   const fotoUrl = taak.fotoId ? fotos.url(taak.fotoId) : null;
-  return el('li', { class: `taak${taak.geselecteerd ? ' gekozen' : ''}` }, [
+
+  const meta = el('span', { class: 'taak-meta' }, [
+    el('span', {
+      class: `label${taak.afgevinkt ? ' accent' : laat ? ' waarschuwing' : ''}`,
+      tekst: taak.afgevinkt ? 'deze week gedaan' : wekenGeledenTekst(taak.wekenGeleden),
+    }),
+    el('span', { class: 'label stil', tekst: TAAKTYPE_LABEL[taak.type] }),
+    taak.type === 'periodiek' ? el('span', { class: 'label stil', tekst: taak.standaardFrequentie }) : null,
+    taak.geschatteMinuten ? el('span', { class: 'label stil', tekst: `${taak.geschatteMinuten} min` }) : null,
+  ]);
+
+  // Opruimtaken staan altijd op de lijst; die zijn niet aan of uit te zetten.
+  const binnenkant = [
+    el('span', { class: 'vink', 'aria-hidden': 'true' }, [vinkIcoon()]),
+    el('span', { class: 'taak-midden' }, [
+      el('span', { class: 'taak-titel', tekst: taak.titel }),
+      meta,
+    ]),
+  ];
+
+  return el('li', { class: `taak${taak.geselecteerd ? ' gekozen' : ''}${taak.vast ? ' vast' : ''}` }, [
     el('div', { class: 'taak-hoofd' }, [
-      el('button', {
-        class: 'taak-rij', type: 'button', 'aria-pressed': taak.geselecteerd ? 'true' : 'false',
-        onclick: () => {
-          const ids = alle.filter((t) => (t.id === taak.id ? !t.geselecteerd : t.geselecteerd)).map((t) => t.id);
-          zetSelectie(sam, ids);
-        },
-      }, [
-        el('span', { class: 'vink', 'aria-hidden': 'true' }, [vinkIcoon()]),
-        el('span', { class: 'taak-midden' }, [
-          el('span', { class: 'taak-titel', tekst: taak.titel }),
-          el('span', { class: 'taak-meta' }, [
-            el('span', {
-              class: `label${taak.afgevinkt ? ' accent' : laat ? ' waarschuwing' : ''}`,
-              tekst: taak.afgevinkt ? 'deze week gedaan' : wekenGeledenTekst(taak.wekenGeleden),
-            }),
-            el('span', { class: 'label stil', tekst: taak.standaardFrequentie }),
-            taak.geschatteMinuten ? el('span', { class: 'label stil', tekst: `${taak.geschatteMinuten} min` }) : null,
-          ]),
-        ]),
-      ]),
+      taak.vast
+        ? el('div', { class: 'taak-rij', stijl: { cursor: 'default' }, title: 'Opruimtaken staan altijd op de weeklijst' }, binnenkant)
+        : el('button', {
+          class: 'taak-rij', type: 'button', 'aria-pressed': taak.geselecteerd ? 'true' : 'false',
+          onclick: () => {
+            const ids = alle.filter((t) => (t.id === taak.id ? !t.geselecteerd : t.geselecteerd)).map((t) => t.id);
+            zetSelectie(sam, ids);
+          },
+        }, binnenkant),
       fotoUrl ? el('button', {
         class: 'foto-knop', type: 'button', 'aria-label': `Foto bij ${taak.titel}`,
         onclick: () => toonFoto(fotoUrl, taak.titel),
@@ -272,7 +282,7 @@ function zetSelectie(sam, taakIds) {
 
 function zetWekelijks(sam, alle) {
   const ids = new Set(alle.filter((t) => t.geselecteerd).map((t) => t.id));
-  for (const taak of alle) if (taak.standaardFrequentie === 'wekelijks') ids.add(taak.id);
+  for (const taak of alle) if (taak.type === 'wekelijks') ids.add(taak.id);
   zetSelectie(sam, [...ids]);
 }
 
@@ -334,7 +344,8 @@ function tekenBibliotheekTaak(taak, lijst, index) {
           el('span', { class: 'taak-titel', tekst: taak.titel }),
           taak.omschrijving ? el('span', { class: 'taak-omschrijving', tekst: taak.omschrijving }) : null,
           el('span', { class: 'taak-meta' }, [
-            el('span', { class: 'label', tekst: taak.standaardFrequentie }),
+            el('span', { class: 'label', tekst: TAAKTYPE_LABEL[taak.type] }),
+            taak.type === 'periodiek' ? el('span', { class: 'label stil', tekst: taak.standaardFrequentie }) : null,
             taak.geschatteMinuten ? el('span', { class: 'label stil', tekst: `${taak.geschatteMinuten} min` }) : null,
             !taak.actief ? el('span', { class: 'label waarschuwing', tekst: 'gearchiveerd' }) : null,
             !taak.fotoId ? el('span', { class: 'label stil', tekst: 'geen foto' }) : null,
@@ -388,8 +399,27 @@ function bewerkTaak(taak) {
   });
   omschrijvingVeld.value = taak?.omschrijving || '';
 
+  const typeVeld = el('select', {}, TAAKTYPES.map((t) => el('option', { value: t, tekst: TAAKTYPE_LABEL[t] })));
+  typeVeld.value = taak?.type || 'wekelijks';
+
   const frequentieVeld = el('select', {}, FREQUENTIES.map((f) => el('option', { value: f, tekst: f })));
   frequentieVeld.value = taak?.standaardFrequentie || 'wekelijks';
+
+  const typeUitleg = el('p', { class: 'hulp' });
+  const frequentieVak = el('label', { class: 'veld' }, [
+    el('span', { tekst: 'Hoe vaak ongeveer' }), frequentieVeld,
+  ]);
+  const werkTypeBij = () => {
+    const gekozen = typeVeld.value;
+    typeUitleg.textContent = {
+      wekelijks: 'Staat standaard aan als je een week samenstelt.',
+      periodiek: 'Zet je zelf aan als hij aan de beurt is. Je ziet erbij hoelang geleden het is gedaan.',
+      indien_nodig: 'Staat altijd op haar lijst. Zij kiest zelf: was al in orde, of heb ik gedaan.',
+    }[gekozen];
+    frequentieVak.hidden = gekozen !== 'periodiek';
+  };
+  typeVeld.addEventListener('change', werkTypeBij);
+  werkTypeBij();
 
   const minutenVeld = el('input', { type: 'number', min: '0', max: '480', step: '5', placeholder: 'bijv. 10' });
   minutenVeld.value = taak?.geschatteMinuten ?? '';
@@ -447,8 +477,9 @@ function bewerkTaak(taak) {
       el('label', { class: 'veld' }, [el('span', { tekst: 'Titel' }), titelVeld]),
       el('label', { class: 'veld' }, [el('span', { tekst: 'Ruimte' }), ruimteVeld]),
       el('label', { class: 'veld' }, [el('span', { tekst: 'Omschrijving' }), omschrijvingVeld]),
+      el('label', { class: 'veld' }, [el('span', { tekst: 'Type' }), typeVeld, typeUitleg]),
       el('div', { class: 'velden-rij' }, [
-        el('label', { class: 'veld' }, [el('span', { tekst: 'Standaardfrequentie' }), frequentieVeld]),
+        frequentieVak,
         el('label', { class: 'veld' }, [el('span', { tekst: 'Geschatte minuten' }), minutenVeld]),
       ]),
       el('label', { class: 'veld' }, [el('span', { tekst: 'Voorbeeldfoto' }), fotoVak]),
@@ -478,7 +509,8 @@ function bewerkTaak(taak) {
             titel,
             ruimteId: ruimteVeld.value,
             omschrijving: omschrijvingVeld.value.trim(),
-            standaardFrequentie: frequentieVeld.value,
+            type: typeVeld.value,
+            standaardFrequentie: typeVeld.value === 'periodiek' ? frequentieVeld.value : 'wekelijks',
             geschatteMinuten: minutenVeld.value === '' ? null : Number(minutenVeld.value),
             fotoId,
           };
@@ -626,6 +658,7 @@ function wisselWeekDetail(w, houder) {
         el('span', { tekst: taak.afgevinkt ? '✅' : '⬜️' }),
         el('span', { stijl: { flex: '1' } }, [
           taak.titel,
+          taak.resultaat ? el('span', { class: 'label stil', stijl: { marginLeft: '6px' }, tekst: RESULTAAT_LABEL[taak.resultaat] }) : null,
           taak.afgevinkt ? el('span', { class: 'stil', tekst: ` — ${tijdstempel(taak.afgevinktOp)}` }) : null,
           taak.opmerking ? el('div', { class: 'opmerking-weergave', stijl: { marginTop: '4px' }, tekst: taak.opmerking }) : null,
         ]),
@@ -647,23 +680,35 @@ function beschrijfBezoek(bezoek) {
 function toonTaakHistorie(taak) {
   const regels = taakHistorie(doc(), taak.id);
   const gedaan = regels.filter((h) => h.afgevinkt);
+  const telling = taak.type === 'indien_nodig' ? resultaatTelling(doc(), taak.id) : null;
   const modaal = toonModaal({
     titel: 'Historie van deze taak',
     inhoud: [
       el('h3', { tekst: taak.titel }),
-      el('p', { class: 'stil klein', tekst: taak.ruimteNaam }),
+      el('p', { class: 'stil klein', tekst: `${taak.ruimteNaam} · ${TAAKTYPE_LABEL[taak.type]}` }),
       el('p', {}, [el('span', {
         class: 'label accent',
         tekst: gedaan.length
           ? `Laatst gedaan: week ${gedaan[0].weeknummer} (${korteDatum(gedaan[0].startdatum)})`
           : 'Nog nooit afgevinkt',
       })]),
+      telling ? el('div', { class: 'notitie' }, [
+        el('div', { class: 'label', tekst: 'Hoe vaak was het nodig?' }),
+        el('p', {
+          tekst: telling.weken
+            ? `In ${meervoud(telling.weken, 'week', 'weken')}: ${telling.was_al_gedaan}× al in orde, `
+              + `${telling.zelf_gedaan}× door haar gedaan`
+              + (telling.open ? `, ${telling.open}× niet beantwoord` : '.')
+            : 'Deze taak heeft nog niet op een weeklijst gestaan.',
+        }),
+      ]) : null,
       el('hr', { class: 'scheider' }),
       regels.length
         ? el('div', {}, regels.map((h) => el('div', { class: 'rij klein', stijl: { padding: '5px 0', borderBottom: '1px solid var(--rand)' } }, [
           el('span', { tekst: h.afgevinkt ? '✅' : '⬜️' }),
           el('span', { stijl: { flex: '1' } }, [
             `Week ${h.weeknummer} · ${korteDatum(h.startdatum)}`,
+            h.resultaat ? el('span', { class: 'label stil', stijl: { marginLeft: '6px' }, tekst: RESULTAAT_LABEL[h.resultaat] }) : null,
             h.afgevinkt && h.afgevinktOp ? el('span', { class: 'stil', tekst: ` — ${tijdstempel(h.afgevinktOp)}` }) : null,
             h.opmerking ? el('div', { class: 'opmerking-weergave', stijl: { marginTop: '4px' }, tekst: h.opmerking }) : null,
           ]),

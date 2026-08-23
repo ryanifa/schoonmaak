@@ -258,7 +258,15 @@ function tekenVoortgang({ gedaan, totaal }) {
   );
 }
 
+// Wat de knoppen bij een opruimtaak zeggen, vanuit haar gezien.
+const KEUZE = {
+  was_al_gedaan: { knop: 'Was al in orde', gekozen: 'Was al in orde' },
+  zelf_gedaan: { knop: 'Heb ik gedaan', gekozen: 'Door jou gedaan' },
+};
+
 function tekenTaak(taak) {
+  if (taak.type === 'indien_nodig') return tekenOpruimtaak(taak);
+
   const rij = el('button', {
     class: 'taak-rij', type: 'button', 'aria-pressed': taak.afgevinkt ? 'true' : 'false',
     onclick: () => wisselAfvinken(taak),
@@ -294,6 +302,74 @@ function tekenTaak(taak) {
     el('div', { class: 'taak-hoofd' }, [rij, fotoKnop]),
     voet,
   ]);
+}
+
+/**
+ * Opruimtaken werken anders: zij beoordeelt zelf of het nodig was. Twee knoppen
+ * in plaats van een vinkje, zodat het verschil bewaard blijft.
+ */
+function tekenOpruimtaak(taak) {
+  const fotoUrl = taak.fotoId ? fotos.url(taak.fotoId) : null;
+  const gekozen = taak.resultaat;
+
+  const kop = el('div', { class: 'taak-hoofd' }, [
+    el('div', { class: 'taak-rij', stijl: { cursor: 'default' } }, [
+      el('span', { class: `vink${gekozen ? '' : ' vraag'}`, 'aria-hidden': 'true' },
+        gekozen ? [vinkIcoon()] : [el('span', { tekst: '?' })]),
+      el('span', { class: 'taak-midden' }, [
+        el('span', { class: 'taak-titel', tekst: taak.titel }),
+        taak.omschrijving ? el('span', { class: 'taak-omschrijving', tekst: taak.omschrijving }) : null,
+        gekozen
+          ? el('span', { class: 'taak-meta' }, [
+            el('span', { class: 'label accent', tekst: KEUZE[gekozen].gekozen }),
+            taak.afgevinktOp ? el('span', { class: 'label stil', tekst: tijdstempel(taak.afgevinktOp) }) : null,
+          ])
+          : el('span', { class: 'taak-meta' }, [
+            el('span', { class: 'label', tekst: 'kijk zelf of het nodig is' }),
+          ]),
+      ]),
+    ]),
+    fotoUrl ? el('button', {
+      class: 'foto-knop', type: 'button', 'aria-label': `Voorbeeldfoto bekijken bij ${taak.titel}`,
+      onclick: () => toonFoto(fotoUrl, taak.titel),
+    }, [el('img', { class: 'duim', src: fotoUrl, alt: '', decoding: 'async' })]) : null,
+  ]);
+
+  const keuze = gekozen
+    ? el('div', { class: 'taak-keuze' }, [
+      el('button', {
+        class: 'knop klein stil', type: 'button', tekst: '↩ Toch anders',
+        onclick: () => kiesResultaat(taak, null),
+      }),
+    ])
+    : el('div', { class: 'taak-keuze' }, ['was_al_gedaan', 'zelf_gedaan'].map((soort) => el('button', {
+      class: 'knop', type: 'button', tekst: KEUZE[soort].knop,
+      onclick: () => kiesResultaat(taak, soort),
+    })));
+
+  return el('li', { class: `taak${gekozen ? ' gedaan' : ''}` }, [
+    kop,
+    keuze,
+    el('div', { class: 'taak-voet' }, [
+      taak.opmerking ? el('div', { class: 'opmerking-weergave', tekst: taak.opmerking }) : null,
+      el('button', {
+        class: 'knop klein stil', type: 'button',
+        tekst: taak.opmerking ? 'Opmerking aanpassen' : '✎ Opmerking',
+        onclick: () => opmerkingBewerken(taak),
+      }),
+    ]),
+  ]);
+}
+
+function kiesResultaat(taak, resultaat) {
+  if (navigator.vibrate) navigator.vibrate(resultaat ? 12 : 6);
+  opslag.doe({
+    soort: 'weektaak.resultaat',
+    week: huidigeWeekSleutel(),
+    taakId: taak.taakId,
+    resultaat,
+    tijd: new Date().toISOString(),
+  }, { vervangSleutel: `resultaat:${taak.taakId}` });
 }
 
 function tekenKlaarMelding({ gedaan, totaal }) {
