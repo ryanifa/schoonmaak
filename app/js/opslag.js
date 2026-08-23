@@ -16,9 +16,12 @@ const BESTANDEN = {
 export function documentNaarBestanden(doc, delen = Object.keys(BESTANDEN)) {
   const uit = {};
   if (delen.includes('bibliotheek')) {
-    uit[BESTANDEN.bibliotheek] = JSON.stringify(
-      { versie: doc.versie ?? DOCUMENT_VERSIE, ruimtes: doc.ruimtes, taken: doc.taken }, null, 1,
-    );
+    uit[BESTANDEN.bibliotheek] = JSON.stringify({
+      versie: doc.versie ?? DOCUMENT_VERSIE,
+      seedVersie: doc.seedVersie,
+      ruimtes: doc.ruimtes,
+      taken: doc.taken,
+    }, null, 1);
   }
   if (delen.includes('weken')) {
     uit[BESTANDEN.weken] = JSON.stringify({ weken: doc.weken }, null, 1);
@@ -43,6 +46,7 @@ export function bestandenNaarDocument(bestanden) {
   const bib = lees(BESTANDEN.bibliotheek);
   if (bib) {
     doc.versie = bib.versie ?? DOCUMENT_VERSIE;
+    if (bib.seedVersie) doc.seedVersie = bib.seedVersie;
     doc.ruimtes = bib.ruimtes || [];
     doc.taken = bib.taken || [];
   }

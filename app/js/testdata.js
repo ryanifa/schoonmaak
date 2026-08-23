@@ -1,7 +1,7 @@
 /* Gevulde voorbeeldgegevens voor de testmodus: een bibliotheek, een paar weken
    historie en een week die half af is. Zo valt er meteen iets te zien en te doen. */
 
-import { maakVoorbeeldDocument } from './seed.js';
+import { maakVoorbeeldDocument, SEED_VERSIE } from './seed.js';
 import { speelAf, weekSleutel, nieuwId } from './document.js';
 import { huidigeWeek, vorigeWeek, startdatumVanWeek, alsDatumTekst } from './week.js';
 import { LokaleBron } from './bron.js';
@@ -100,7 +100,7 @@ export function maakTestDocument() {
     },
   });
 
-  return speelAf(doc, bewerkingen);
+  return { ...speelAf(doc, bewerkingen), seedVersie: SEED_VERSIE };
 }
 
 /**
@@ -111,8 +111,21 @@ export function maakTestDocument() {
 export async function zorgVoorTestgegevens() {
   const bron = new LokaleBron('data');
   const stand = await bron.haal(null);
-  if (Object.keys(stand.bestanden || {}).length) return false;
-  const { documentNaarBestanden } = await import('./opslag.js');
+  const { documentNaarBestanden, bestandenNaarDocument } = await import('./opslag.js');
+
+  if (Object.keys(stand.bestanden || {}).length) {
+    // Al gevuld — maar is het nog de huidige bibliotheek?
+    let versie = null;
+    try {
+      versie = bestandenNaarDocument(stand.bestanden).seedVersie ?? null;
+    } catch {
+      versie = null; // beschadigd: dan opnieuw vullen
+    }
+    if (versie === SEED_VERSIE) return false;
+    // Voorbeeldgegevens zijn er om weggegooid te worden; verse versie erin.
+    new LokaleBron('fotos').wis();
+  }
+
   await bron.schrijf(documentNaarBestanden(maakTestDocument()));
   return true;
 }

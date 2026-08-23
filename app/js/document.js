@@ -57,6 +57,8 @@ export function nieuwId(voorvoegsel) {
 export function pasToe(doc, bewerking) {
   const d = {
     versie: doc.versie ?? DOCUMENT_VERSIE,
+    // Blijft staan zodat de testmodus weet welke voorbeeldbibliotheek erin zit.
+    ...(doc.seedVersie ? { seedVersie: doc.seedVersie } : {}),
     ruimtes: [...(doc.ruimtes || [])],
     taken: [...(doc.taken || [])],
     weken: { ...(doc.weken || {}) },

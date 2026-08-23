@@ -301,3 +301,43 @@ test('foto\'s worden maar één keer opgehaald', async () => {
   await fotos.laad(['f3']);
   assert.equal(github.tellers.get, naEerste + 1, 'een onbekende foto zorgt wel voor een verzoek');
 });
+
+test('de testmodus ververst zichzelf als de bibliotheek is veranderd', async () => {
+  const { LokaleBron } = await import('../app/js/bron.js');
+  const { zorgVoorTestgegevens } = await import('../app/js/testdata.js');
+  const { SEED_VERSIE } = await import('../app/js/seed.js');
+  const bron = new LokaleBron('data');
+  bron.wis();
+
+  assert.equal(await zorgVoorTestgegevens(), true, 'eerste keer vullen');
+  assert.equal(await zorgVoorTestgegevens(), false, 'daarna niet opnieuw');
+
+  // Een oudere bibliotheek in de browser moet vervangen worden.
+  const stand = bron.lees();
+  const bib = JSON.parse(stand.bestanden['schoonmaak-bibliotheek.json']);
+  bib.seedVersie = 'iets-ouds';
+  stand.bestanden['schoonmaak-bibliotheek.json'] = JSON.stringify(bib);
+  bron.bewaar(stand);
+  assert.equal(await zorgVoorTestgegevens(), true, 'oude gegevens worden vervangen');
+
+  const na = JSON.parse(bron.lees().bestanden['schoonmaak-bibliotheek.json']);
+  assert.equal(na.seedVersie, SEED_VERSIE);
+});
+
+test('bewerken in de testmodus wist de voorbeeldgegevens niet', async () => {
+  const { LokaleBron } = await import('../app/js/bron.js');
+  const { zorgVoorTestgegevens } = await import('../app/js/testdata.js');
+  new LokaleBron('data').wis();
+  await zorgVoorTestgegevens();
+
+  const opslag = new Opslag({ test: true, rol: 'beheerder', dataGist: null, fotoGist: null, sleutel: null });
+  await opslag.begin();
+  const taakId = opslag.document().taken[0].id;
+  opslag.doe({ soort: 'taak.bewerk', id: taakId, velden: { titel: 'Zelf aangepast' } });
+  await opslag.verstuur();
+
+  // Na een bewerking mag de app niet denken dat de gegevens verouderd zijn.
+  assert.equal(await zorgVoorTestgegevens(), false, 'niet opnieuw gevuld');
+  const opnieuw = new Opslag({ test: true, rol: 'beheerder', dataGist: null, fotoGist: null, sleutel: null });
+  assert.equal((await opnieuw.begin()).taken[0].titel, 'Zelf aangepast');
+});

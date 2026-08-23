@@ -128,3 +128,10 @@ export function maakVoorbeeldDocument() {
 }
 
 export const AANTAL_VOORBEELDTAKEN = TAKEN.length;
+
+/**
+ * Verandert zodra de bibliotheek wordt aangepast. De testmodus gebruikt dit om
+ * verouderde voorbeeldgegevens te vervangen — anders zou je in een browser waar
+ * je eerder hebt rondgekeken nog het oude huis zien.
+ */
+export const SEED_VERSIE = `${RUIMTES.length}-${TAKEN.length}-${TAKEN.map((t) => t[1]).join('|').length}`;
