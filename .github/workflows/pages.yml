@@ -41,6 +41,17 @@ jobs:
       - uses: actions/configure-pages@v5
         with:
           enablement: true
+      - name: Versie stempelen
+        run: |
+          KORT="${GITHUB_SHA::7}"
+          NU="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          printf '{\n  "versie": "%s",\n  "commit": "%s",\n  "datum": "%s"\n}\n' \
+            "$KORT" "$GITHUB_SHA" "$NU" > app/versie.json
+          # Ook de cachenaam van de service worker, anders blijft de oude app staan.
+          sed -i "s/const VERSIE = '[^']*'/const VERSIE = 'schoonmaak-$KORT'/" app/sw.js
+          grep -n "const VERSIE" app/sw.js
+          cat app/versie.json
+
       - name: App klaarzetten
         uses: actions/upload-pages-artifact@v3
         with:

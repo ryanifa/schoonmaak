@@ -12,8 +12,9 @@ import {
   weekSleutel, nieuwId, ruimteLijst, taakLijst, weekOverzicht,
   weekSamensteller, historie, taakHistorie, alleOpmerkingen, aantalOngelezen,
   takenVanVorigeWeek, lopendBezoek, gewerkteMinuten, alsDuur, haalWeek,
-  schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam,
+  schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam, historieOmvang, groepeerPerRuimte,
 } from './document.js';
+import { versieRegel } from './versie.js';
 import { toonTestbalkIndienNodig } from './testbanner.js';
 import { huidigeWeek } from './week.js';
 import {
@@ -708,13 +709,74 @@ function tekenHistorie() {
     el('div', { class: 'kaart-kop' }, [el('h2', { tekst: 'Per taak' })]),
     el('div', { class: 'kaart-binnen' }, [
       el('p', { class: 'hulp', tekst: 'Tik op een taak om te zien wanneer die de afgelopen tijd gedaan is.' }),
-      el('div', {}, taakLijst(doc()).map((taak) => el('button', {
-        class: 'knop klein', stijl: { margin: '0 6px 6px 0' },
-        tekst: `${taak.ruimteNaam} · ${taak.titel}`,
-        onclick: () => toonTaakHistorie(taak),
-      }))),
+      ...groepeerPerRuimte(taakLijst(doc()).map((t) => ({ ...t, ruimteId: t.ruimteId, ruimteNaam: t.ruimteNaam })))
+        .map((groep) => el('div', { class: 'taakgroep' }, [
+          el('h3', { class: 'taakgroep-kop', tekst: groep.ruimteNaam }),
+          el('div', {}, groep.taken.map((taak) => el('button', {
+            class: 'knop klein', stijl: { margin: '0 6px 6px 0' },
+            tekst: taak.titel,
+            onclick: () => toonTaakHistorie(taak),
+          }))),
+        ])),
     ]),
   ]));
+
+  doel.append(tekenOpruimen());
+  doel.append(el('p', { class: 'voetregel', id: 'versieregel' }));
+  versieRegel().then((regel) => {
+    const knoop = $('#versieregel');
+    if (knoop) knoop.textContent = regel;
+  });
+}
+
+/* Opruimen: de historie leegmaken na het uitproberen. */
+
+function tekenOpruimen() {
+  const omvang = historieOmvang(doc());
+  return el('div', { class: 'kaart' }, [
+    el('div', { class: 'kaart-kop' }, [el('h2', { tekst: 'Opruimen' })]),
+    el('div', { class: 'kaart-binnen' }, [
+      el('p', { tekst: 'Heb je zitten proberen? Hiermee gooi je de hele historie weg en begin je met een schone lei.' }),
+      el('p', { class: 'hulp', tekst: 'De takenbibliotheek, de ruimtes, de foto\'s en de schoonmaaksters blijven staan.' }),
+      el('button', {
+        class: 'knop gevaar', tekst: '🧹 Historie wissen',
+        disabled: !omvang.aantalWeken && !omvang.aantalBerichten,
+        onclick: () => vraagHistorieWissen(omvang),
+      }),
+    ]),
+  ]);
+}
+
+function vraagHistorieWissen(omvang) {
+  const regels = [
+    [omvang.aantalWeken, 'week', 'weken'],
+    [omvang.aantalAfgevinkt, 'afgevinkte taak', 'afgevinkte taken'],
+    [omvang.aantalOpmerkingen, 'opmerking', 'opmerkingen'],
+    [omvang.aantalBezoeken, 'geregistreerde werkbeurt', 'geregistreerde werkbeurten'],
+    [omvang.aantalBerichten, 'bericht', 'berichten'],
+  ].filter(([aantal]) => aantal > 0);
+
+  const modaal = toonModaal({
+    titel: 'Historie wissen?',
+    ondertitel: 'Dit kun je niet terugdraaien.',
+    inhoud: [
+      el('p', { tekst: 'Weg gaat:' }),
+      el('ul', { stijl: { margin: '0 0 14px', paddingLeft: '22px' } },
+        regels.map(([aantal, enkel, meer]) => el('li', { tekst: meervoud(aantal, enkel, meer) }))),
+      el('p', { class: 'hulp', tekst: 'Blijft staan: de takenbibliotheek, de ruimtes, de foto\'s en de schoonmaaksters.' }),
+    ],
+    knoppen: [
+      { tekst: 'Annuleren', bij: () => modaal.sluit() },
+      {
+        tekst: 'Ja, wissen', primair: true,
+        bij: () => {
+          opslag.doe({ soort: 'historie.wis', weken: omvang.weken, berichten: omvang.berichten });
+          modaal.sluit();
+          meld('Historie gewist', 'goed');
+        },
+      },
+    ],
+  });
 }
 
 function tekenHistorieWeek(w, nu) {

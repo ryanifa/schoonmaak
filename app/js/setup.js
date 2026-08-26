@@ -7,6 +7,7 @@ import { maakLink, bewaarToegang, haalToegang, vergeetToegang, testToegang } fro
 import { LokaleBron } from './bron.js';
 import { maakTestDocument } from './testdata.js';
 import { el, leeg, $, voegToe } from './util.js';
+import { versieRegel } from './versie.js';
 import { meld } from './melding.js';
 
 const scherm = () => $('#scherm');
@@ -265,3 +266,7 @@ function linkKaart({ titel, uitleg, link, knopTekst, toonLink = true }) {
 }
 
 begin();
+
+// Onderaan de pagina: welke versie draait hier?
+document.body.append(el('p', { class: 'voetregel', id: 'versieregel' }));
+versieRegel().then((regel) => { $('#versieregel').textContent = regel; });

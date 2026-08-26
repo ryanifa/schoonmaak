@@ -385,3 +385,22 @@ test('de wachtrij laat velden van een bewerking met rust', async () => {
   const doc = await nieuweOpslag().begin();
   assert.deepEqual(doc.instellingen, { standaardSchoonmaker: 'abc' });
 });
+
+test('historie wissen komt ook in de Gist terecht', async () => {
+  const { historieOmvang } = await import('../app/js/document.js');
+  const opslag = nieuweOpslag();
+  await opslag.begin();
+  const week = weekSleutel(2026, 34);
+  const taakId = opslag.document().taken.find((t) => t.type === 'wekelijks').id;
+  opslag.doe({ soort: 'week.taken', week, taakIds: [taakId] });
+  opslag.doe({ soort: 'weektaak.afvinken', week, taakId, afgevinkt: true, tijd: 't' });
+  await opslag.verstuur();
+
+  const omvang = historieOmvang(opslag.document());
+  opslag.doe({ soort: 'historie.wis', weken: omvang.weken, berichten: omvang.berichten });
+  await opslag.verstuur();
+
+  const doc = await nieuweOpslag().begin();
+  assert.deepEqual(doc.weken, {});
+  assert.ok(doc.taken.length >= 25, 'de bibliotheek staat er nog');
+});

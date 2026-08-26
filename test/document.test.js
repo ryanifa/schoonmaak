@@ -6,7 +6,7 @@ import {
   ruimteLijst, taakLijst, laatstGedaan, haalWeek,
   lopendBezoek, gewerkteMinuten, vergetenBezoeken, alsDuur,
   altijdOpDeLijst, resultaatTelling, TAAKTYPES,
-  schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam,
+  schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam, historieOmvang,
 } from '../app/js/document.js';
 import { maakVoorbeeldDocument } from '../app/js/seed.js';
 
@@ -597,4 +597,64 @@ test('de kop toont de dag van vandaag, niet de maandag van de week', async () =>
   const { weekTitel } = await import('../app/js/util.js');
   assert.equal(weekTitel({ weeknummer: 35 }, new Date(2026, 7, 26)), 'Week 35 — woensdag 26 augustus');
   assert.equal(weekTitel({ weeknummer: 35 }, new Date(2026, 7, 28)), 'Week 35 — vrijdag 28 augustus');
+});
+
+/* -------------------------------------------------------- historie wissen --- */
+
+test('historie wissen laat de bibliotheek staan', async () => {
+  const { maakTestDocument } = await import('../app/js/testdata.js');
+  const { historieOmvang } = await import('../app/js/document.js');
+  let doc = maakTestDocument();
+
+  const voor = historieOmvang(doc);
+  assert.ok(voor.aantalWeken > 0 && voor.aantalBezoeken > 0 && voor.aantalBerichten > 0);
+
+  doc = pasToe(doc, { soort: 'historie.wis', weken: voor.weken, berichten: voor.berichten });
+
+  const na = historieOmvang(doc);
+  assert.equal(na.aantalWeken, 0);
+  assert.equal(na.aantalAfgevinkt, 0);
+  assert.equal(na.aantalBezoeken, 0);
+  assert.equal(na.aantalBerichten, 0);
+
+  assert.ok(doc.taken.length >= 25, 'taken blijven');
+  assert.ok(doc.ruimtes.length >= 8, 'ruimtes blijven');
+  assert.equal(doc.schoonmakers.length, 2, 'schoonmaaksters blijven');
+  assert.ok(doc.instellingen.standaardSchoonmaker, 'de standaard blijft');
+});
+
+test('wissen raakt alleen wat er op dat moment was', () => {
+  // Belangrijk: opnieuw afspelen mag geen weken wissen die er later bij kwamen.
+  let doc = leegDocument();
+  doc = pasToe(doc, { soort: 'week.notitie', week: W33, notitie: 'oud' });
+  const omvang = { weken: [W33], berichten: [] };
+
+  doc = pasToe(doc, { soort: 'week.notitie', week: W34, notitie: 'nieuw' });
+  doc = pasToe(doc, { soort: 'historie.wis', ...omvang });
+
+  assert.equal(doc.weken[W33], undefined, 'de oude week is weg');
+  assert.equal(doc.weken[W34].notitie, 'nieuw', 'de nieuwe week blijft');
+
+  // En nog eens afspelen verandert niets meer.
+  assert.deepEqual(pasToe(doc, { soort: 'historie.wis', ...omvang }), doc);
+});
+
+test('historieOmvang telt wat er weggaat', () => {
+  let doc = maakVoorbeeldDocument();
+  const taakId = doc.taken.find((t) => t.type === 'wekelijks').id;
+  doc = metWeek(doc, W34, [taakId]);
+  doc = pasToe(doc, { soort: 'weektaak.afvinken', week: W34, taakId, afgevinkt: true, tijd: 't' });
+  doc = pasToe(doc, { soort: 'weektaak.opmerking', week: W34, taakId, opmerking: 'lekt' });
+  doc = pasToe(doc, { soort: 'bezoek.start', week: W34, id: 'b1', tijd: 't' });
+  doc = pasToe(doc, {
+    soort: 'bericht.maak',
+    bericht: { id: 'm1', week: W34, afzender: 'schoonmaakster', tekst: 'hoi', aangemaaktOp: 't', gelezen: false },
+  });
+
+  const omvang = historieOmvang(doc);
+  assert.equal(omvang.aantalWeken, 1);
+  assert.equal(omvang.aantalAfgevinkt, 1);
+  assert.equal(omvang.aantalOpmerkingen, 1);
+  assert.equal(omvang.aantalBezoeken, 1);
+  assert.equal(omvang.aantalBerichten, 1);
 });

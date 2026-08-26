@@ -226,6 +226,15 @@ export function pasToe(doc, bewerking) {
       };
       break;
     }
+    case 'historie.wis': {
+      // Bewust een expliciete lijst en geen "alles": opnieuw afspelen wist dan
+      // precies dezelfde weken, en niet wat er inmiddels bij is gekomen.
+      const wegWeken = new Set(bewerking.weken || []);
+      const wegBerichten = new Set(bewerking.berichten || []);
+      d.weken = Object.fromEntries(Object.entries(d.weken).filter(([sleutel]) => !wegWeken.has(sleutel)));
+      d.berichten = d.berichten.filter((b) => !wegBerichten.has(b.id));
+      break;
+    }
     case 'bericht.maak': {
       if (d.berichten.some((b) => b.id === bewerking.bericht.id)) break;
       d.berichten = [bewerking.bericht, ...d.berichten].slice(0, 500);
@@ -278,6 +287,8 @@ function zorgVoorWeek(d, sleutel) {
 
 /** Welke bestanden raakt deze bewerking? Bepaalt wat er weggeschreven wordt. */
 export function geraakteDelen(bewerking) {
+  // Historie wissen raakt zowel de weken als de berichten.
+  if (bewerking.soort === 'historie.wis') return ['weken', 'berichten'];
   if (bewerking.soort.startsWith('ruimte.')
     || bewerking.soort.startsWith('taak.')
     || bewerking.soort.startsWith('schoonmaker.')
@@ -580,6 +591,22 @@ export function resultaatTelling(doc, taakId) {
     else if (!stand.afgevinkt) telling.open += 1;
   }
   return telling;
+}
+
+/** Wat er verdwijnt als je de historie wist. */
+export function historieOmvang(doc) {
+  const weken = Object.keys(doc.weken || {});
+  const standen = weken.flatMap((s) => Object.values(doc.weken[s].taken || {}));
+  const bezoeken = weken.flatMap((s) => doc.weken[s].bezoeken || []);
+  return {
+    weken,
+    berichten: (doc.berichten || []).map((b) => b.id),
+    aantalWeken: weken.length,
+    aantalAfgevinkt: standen.filter((t) => t.afgevinkt).length,
+    aantalOpmerkingen: standen.filter((t) => t.opmerking?.trim()).length,
+    aantalBezoeken: bezoeken.length,
+    aantalBerichten: (doc.berichten || []).length,
+  };
 }
 
 export function aantalOngelezen(doc, voorRol) {

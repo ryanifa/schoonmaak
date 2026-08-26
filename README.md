@@ -250,10 +250,31 @@ app/
 document plus bewerking naar nieuw document. Daardoor is het datamodel los te
 testen en later uit te breiden.
 
+## Versie en opruimen
+
+Onderaan de beheerpagina en de inrichtingspagina staat welke versie er draait —
+het commit-nummer plus de publicatiedatum. Dat stempelt de workflow bij het
+publiceren in `versie.json`, en tegelijk in de cachenaam van de service worker.
+
+Dat laatste is belangrijk: eerder stond die naam vast, waardoor je browser na een
+publicatie de oude app bleef serveren tot je hard verversde. Nu vervalt de oude
+cache vanzelf, en verschijnt er onderin een balkje **"Er staat een nieuwe versie
+klaar — Vernieuwen"** zodra dat zo is.
+
+**Historie wissen.** Onderaan het tabblad *Historie* staat een knop om alles weg
+te gooien wat je tijdens het uitproberen hebt opgebouwd: weken, afvinkjes,
+opmerkingen, werkbeurten en berichten. Het venster somt eerst op wat er precies
+verdwijnt. De takenbibliotheek, de ruimtes, de foto's en de schoonmaaksters
+blijven staan.
+
+De bewerking bevat een expliciete lijst van wat er weg moet, en niet "alles".
+Daardoor wist opnieuw afspelen precies dezelfde weken, en niet wat er intussen
+op een ander apparaat bij is gekomen.
+
 ## Testen
 
 ```bash
-npm test        # 82 tests
+npm test        # 86 tests
 npm run dev     # bekijk de app lokaal op http://localhost:4321
 ```
 

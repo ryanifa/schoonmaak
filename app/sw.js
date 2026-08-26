@@ -29,7 +29,9 @@ const SCHIL = [
   './js/testbanner.js',
   './js/testdata.js',
   './js/util.js',
+  './js/versie.js',
   './js/week.js',
+  './versie.json',
 ];
 
 self.addEventListener('install', (e) => {
