@@ -123,9 +123,13 @@ export function tijdstempel(isoTekst) {
   return `${korteDatum(d)} om ${tijd}`;
 }
 
-/** "Week 35 — vanaf maandag 24 augustus" */
-export function weekTitel(week) {
-  return `Week ${week.weeknummer} — vanaf ${langeDatum(week.startdatum)}`;
+/**
+ * "Week 35 — dinsdag 26 augustus"
+ * Bewust de dag van vandaag en niet de maandag van de week: zij opent de lijst
+ * vandaag, en wil weten welke dag het is.
+ */
+export function weekTitel(week, vandaag = new Date()) {
+  return `Week ${week.weeknummer} — ${langeDatum(vandaag)}`;
 }
 
 /** "5 weken geleden" / "deze week" / "nog niet gedaan" */

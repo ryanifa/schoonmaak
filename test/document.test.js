@@ -6,6 +6,7 @@ import {
   ruimteLijst, taakLijst, laatstGedaan, haalWeek,
   lopendBezoek, gewerkteMinuten, vergetenBezoeken, alsDuur,
   altijdOpDeLijst, resultaatTelling, TAAKTYPES,
+  schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam,
 } from '../app/js/document.js';
 import { maakVoorbeeldDocument } from '../app/js/seed.js';
 
@@ -501,4 +502,99 @@ test('taken uit een oudere versie krijgen vanzelf een type', () => {
   const lijst = taakLijst(doc);
   assert.equal(lijst.find((t) => t.id === 't1').type, 'wekelijks');
   assert.equal(lijst.find((t) => t.id === 't2').type, 'periodiek');
+});
+
+/* ------------------------------------------------------- schoonmaaksters --- */
+
+test('de eerste schoonmaakster wordt vanzelf de standaard', () => {
+  let doc = leegDocument();
+  assert.equal(standaardSchoonmaker(doc), null, 'zolang er niemand is, valt er niets te kiezen');
+
+  doc = pasToe(doc, { soort: 'schoonmaker.maak', id: 's1', naam: 'Anna' });
+  assert.equal(standaardSchoonmaker(doc).naam, 'Anna');
+
+  doc = pasToe(doc, { soort: 'schoonmaker.maak', id: 's2', naam: 'Fatima' });
+  assert.equal(standaardSchoonmaker(doc).naam, 'Anna', 'de tweede neemt het niet over');
+  assert.deepEqual(schoonmakerLijst(doc).map((s) => s.naam), ['Anna', 'Fatima']);
+});
+
+test('de beheerder kan een andere standaard aanwijzen', () => {
+  let doc = pasToe(leegDocument(), { soort: 'schoonmaker.maak', id: 's1', naam: 'Anna' });
+  doc = pasToe(doc, { soort: 'schoonmaker.maak', id: 's2', naam: 'Fatima' });
+  doc = pasToe(doc, { soort: 'instelling.zet', sleutel: 'standaardSchoonmaker', waarde: 's2' });
+  assert.equal(standaardSchoonmaker(doc).naam, 'Fatima');
+});
+
+test('een gearchiveerde schoonmaakster kan geen standaard blijven', () => {
+  let doc = pasToe(leegDocument(), { soort: 'schoonmaker.maak', id: 's1', naam: 'Anna' });
+  doc = pasToe(doc, { soort: 'schoonmaker.maak', id: 's2', naam: 'Fatima' });
+  doc = pasToe(doc, { soort: 'instelling.zet', sleutel: 'standaardSchoonmaker', waarde: 's2' });
+  doc = pasToe(doc, { soort: 'schoonmaker.bewerk', id: 's2', velden: { actief: false } });
+
+  assert.equal(standaardSchoonmaker(doc).naam, 'Anna', 'valt terug op wie er nog wel is');
+  assert.deepEqual(schoonmakerLijst(doc).map((s) => s.naam), ['Anna'], 'staat niet meer in haar keuzelijst');
+  assert.equal(schoonmakerNaam(doc, 's2'), 'Fatima', 'maar oude bezoeken houden haar naam');
+});
+
+test('archiveren van de laatste laat geen standaard achter die niet bestaat', () => {
+  let doc = pasToe(leegDocument(), { soort: 'schoonmaker.maak', id: 's1', naam: 'Anna' });
+  doc = pasToe(doc, { soort: 'schoonmaker.bewerk', id: 's1', velden: { actief: false } });
+  assert.equal(standaardSchoonmaker(doc), null);
+  assert.equal(doc.instellingen.standaardSchoonmaker, null);
+});
+
+test('een bezoek onthoudt wie er werkte', () => {
+  let doc = pasToe(leegDocument(), { soort: 'schoonmaker.maak', id: 's1', naam: 'Anna' });
+  doc = pasToe(doc, { soort: 'bezoek.start', week: W34, id: 'b1', tijd: '2026-08-18T09:00:00', schoonmakerId: 's1' });
+  doc = pasToe(doc, { soort: 'bezoek.stop', week: W34, id: 'b1', tijd: '2026-08-18T11:00:00' });
+
+  const bezoek = haalWeek(doc, 2026, 34).bezoeken[0];
+  assert.equal(bezoek.schoonmakerId, 's1');
+  assert.equal(schoonmakerNaam(doc, bezoek.schoonmakerId), 'Anna');
+  assert.equal(gewerkteMinuten(haalWeek(doc, 2026, 34)), 120);
+});
+
+test('twee schoonmaaksters in dezelfde week blijven uit elkaar', () => {
+  let doc = pasToe(leegDocument(), { soort: 'schoonmaker.maak', id: 's1', naam: 'Anna' });
+  doc = pasToe(doc, { soort: 'schoonmaker.maak', id: 's2', naam: 'Fatima' });
+  doc = pasToe(doc, { soort: 'bezoek.start', week: W34, id: 'b1', tijd: '2026-08-18T09:00:00', schoonmakerId: 's1' });
+  doc = pasToe(doc, { soort: 'bezoek.stop', week: W34, id: 'b1', tijd: '2026-08-18T10:00:00' });
+  doc = pasToe(doc, { soort: 'bezoek.start', week: W34, id: 'b2', tijd: '2026-08-20T13:00:00', schoonmakerId: 's2' });
+  doc = pasToe(doc, { soort: 'bezoek.stop', week: W34, id: 'b2', tijd: '2026-08-20T15:00:00' });
+
+  const week = haalWeek(doc, 2026, 34);
+  assert.deepEqual(week.bezoeken.map((b) => schoonmakerNaam(doc, b.schoonmakerId)), ['Anna', 'Fatima']);
+  assert.equal(gewerkteMinuten(week), 180, 'de uren tellen wel gewoon bij elkaar op');
+});
+
+test('zonder schoonmaaksters werkt starten gewoon', () => {
+  let doc = leegDocument();
+  doc = pasToe(doc, { soort: 'bezoek.start', week: W34, id: 'b1', tijd: '2026-08-18T09:00:00', schoonmakerId: null });
+  const bezoek = haalWeek(doc, 2026, 34).bezoeken[0];
+  assert.equal(bezoek.schoonmakerId, null);
+  assert.equal(schoonmakerNaam(doc, null), null);
+});
+
+test('schoonmaaksters opnieuw afspelen levert geen dubbelen op', () => {
+  const bewerkingen = [
+    { soort: 'schoonmaker.maak', id: 's1', naam: 'Anna' },
+    { soort: 'schoonmaker.maak', id: 's2', naam: 'Fatima' },
+    { soort: 'instelling.zet', sleutel: 'standaardSchoonmaker', waarde: 's2' },
+    { soort: 'bezoek.start', week: W34, id: 'b1', tijd: 't', schoonmakerId: 's2' },
+  ];
+  const eenmaal = speelAf(leegDocument(), bewerkingen);
+  assert.deepEqual(speelAf(eenmaal, bewerkingen), eenmaal);
+});
+
+test('schoonmaaksters herordenen werkt', () => {
+  let doc = pasToe(leegDocument(), { soort: 'schoonmaker.maak', id: 's1', naam: 'Anna' });
+  doc = pasToe(doc, { soort: 'schoonmaker.maak', id: 's2', naam: 'Fatima' });
+  doc = pasToe(doc, { soort: 'schoonmaker.volgorde', ids: ['s2', 's1'] });
+  assert.deepEqual(schoonmakerLijst(doc).map((s) => s.naam), ['Fatima', 'Anna']);
+});
+
+test('de kop toont de dag van vandaag, niet de maandag van de week', async () => {
+  const { weekTitel } = await import('../app/js/util.js');
+  assert.equal(weekTitel({ weeknummer: 35 }, new Date(2026, 7, 26)), 'Week 35 — woensdag 26 augustus');
+  assert.equal(weekTitel({ weeknummer: 35 }, new Date(2026, 7, 28)), 'Week 35 — vrijdag 28 augustus');
 });

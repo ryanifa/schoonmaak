@@ -12,6 +12,7 @@ import {
   weekSleutel, nieuwId, ruimteLijst, taakLijst, weekOverzicht,
   weekSamensteller, historie, taakHistorie, alleOpmerkingen, aantalOngelezen,
   takenVanVorigeWeek, lopendBezoek, gewerkteMinuten, alsDuur, haalWeek,
+  schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam,
 } from './document.js';
 import { toonTestbalkIndienNodig } from './testbanner.js';
 import { huidigeWeek } from './week.js';
@@ -202,7 +203,10 @@ function tekenWeek() {
         el('span', { class: 'label accent', tekst: `${meervoud(gekozen.length, 'taak', 'taken')} gepland` }),
         minuten ? el('span', { class: 'label', tekst: `± ${Math.round(minuten / 5) * 5} minuten` }) : null,
         bezig
-          ? el('span', { class: 'label waarschuwing', tekst: `nu bezig · ${alsDuur(gewerkt)}` })
+          ? el('span', {
+            class: 'label waarschuwing',
+            tekst: [wieIsBezig(weekStand), 'nu bezig', alsDuur(gewerkt)].filter(Boolean).join(' · '),
+          })
           : gewerkt ? el('span', { class: 'label', tekst: `gewerkt: ${alsDuur(gewerkt)}` }) : null,
         el('span', { class: 'label stil', tekst: `${alle.length} taken in de bibliotheek` }),
       ]),
@@ -311,6 +315,7 @@ function tekenBibliotheek() {
       el('div', { class: 'knoppenrij' }, [
         el('button', { class: 'knop primair', tekst: '+ Nieuwe taak', onclick: () => bewerkTaak(null) }),
         el('button', { class: 'knop', tekst: '⌂ Ruimtes', onclick: beheerRuimtes }),
+        el('button', { class: 'knop', tekst: '👤 Schoonmaaksters', onclick: beheerSchoonmakers }),
         el('button', {
           class: 'knop stil klein',
           tekst: toonGearchiveerd ? 'Verberg gearchiveerd' : 'Toon gearchiveerd',
@@ -529,6 +534,99 @@ function bewerkTaak(taak) {
   setTimeout(() => titelVeld.focus(), 80);
 }
 
+function beheerSchoonmakers() {
+  const lijst = el('div');
+
+  function tekenLijst() {
+    const d = doc();
+    const allen = schoonmakerLijst(d, { inclusiefGearchiveerd: true });
+    const standaard = standaardSchoonmaker(d);
+
+    if (!allen.length) {
+      voegToe(leeg(lijst), el('p', {
+        class: 'stil',
+        tekst: 'Nog niemand toegevoegd. Zolang er niemand in staat, hoeft zij bij het starten niets te kiezen.',
+      }));
+      return;
+    }
+
+    voegToe(leeg(lijst), ...allen.map((persoon, i) => {
+      const naamVeld = el('input', { type: 'text', maxlength: '60', stijl: { flex: '1' } });
+      naamVeld.value = persoon.naam;
+      naamVeld.addEventListener('change', () => {
+        const naam = naamVeld.value.trim();
+        if (!naam || naam === persoon.naam) return;
+        opslag.doe({ soort: 'schoonmaker.bewerk', id: persoon.id, velden: { naam } });
+        tekenLijst();
+      });
+
+      const verschuif = (richting) => {
+        const ids = allen.map((s) => s.id);
+        const j = i + richting;
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+        opslag.doe({ soort: 'schoonmaker.volgorde', ids });
+        tekenLijst();
+      };
+
+      const isStandaard = standaard?.id === persoon.id;
+      return el('div', { stijl: { marginBottom: '12px' } }, [
+        el('div', { class: 'rij', stijl: { flexWrap: 'wrap' } }, [
+          naamVeld,
+          el('button', { class: 'knop klein', tekst: '\u2191', 'aria-label': 'Omhoog', disabled: i === 0, onclick: () => verschuif(-1) }),
+          el('button', { class: 'knop klein', tekst: '\u2193', 'aria-label': 'Omlaag', disabled: i === allen.length - 1, onclick: () => verschuif(1) }),
+          el('button', {
+            class: `knop klein${persoon.actief ? ' gevaar' : ''}`,
+            tekst: persoon.actief ? 'Archiveren' : 'Terug',
+            onclick: () => {
+              opslag.doe({ soort: 'schoonmaker.bewerk', id: persoon.id, velden: { actief: !persoon.actief } });
+              tekenLijst();
+            },
+          }),
+        ]),
+        persoon.actief
+          ? el('div', { class: 'rij klein', stijl: { marginTop: '5px' } }, [
+            isStandaard
+              ? el('span', { class: 'label accent', tekst: '\u2605 standaard' })
+              : el('button', {
+                class: 'knop klein stil', tekst: 'Maak standaard',
+                onclick: () => {
+                  opslag.doe({ soort: 'instelling.zet', sleutel: 'standaardSchoonmaker', waarde: persoon.id });
+                  tekenLijst();
+                },
+              }),
+          ])
+          : el('div', { class: 'hulp', tekst: 'gearchiveerd \u2014 staat niet meer in haar keuzelijst' }),
+      ]);
+    }));
+  }
+
+  const nieuwVeld = el('input', { type: 'text', maxlength: '60', placeholder: 'Naam' });
+  tekenLijst();
+
+  const modaal = toonModaal({
+    titel: 'Schoonmaaksters',
+    ondertitel: 'Staat er meer dan \u00e9\u00e9n, dan kiest zij bij het starten haar naam. De standaard staat dan alvast voor.',
+    inhoud: [
+      lijst,
+      el('hr', { class: 'scheider' }),
+      el('div', { class: 'rij' }, [
+        nieuwVeld,
+        el('button', {
+          class: 'knop primair', type: 'button', tekst: 'Toevoegen',
+          onclick: () => {
+            const naam = nieuwVeld.value.trim();
+            if (!naam) return;
+            opslag.doe({ soort: 'schoonmaker.maak', id: nieuwId('s'), naam });
+            nieuwVeld.value = '';
+            tekenLijst();
+          },
+        }),
+      ]),
+    ],
+    knoppen: [{ tekst: 'Klaar', primair: true, bij: () => { modaal.sluit(); teken(); } }],
+  });
+}
+
 function beheerRuimtes() {
   const lijst = el('div');
 
@@ -672,14 +770,21 @@ function wisselWeekDetail(w, houder) {
   ]));
 }
 
-/** "dinsdag 9:00 – 11:30 (2 uur 30)" */
+function wieIsBezig(weekStand) {
+  const lopend = lopendBezoek(weekStand);
+  return lopend ? schoonmakerNaam(doc(), lopend.schoonmakerId) : null;
+}
+
+/** "Anna · dinsdag 11 augustus 9:00 – 11:30 (2 uur 30)" */
 function beschrijfBezoek(bezoek) {
   const start = new Date(bezoek.gestartOp);
   const klok = (d) => `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
-  if (!bezoek.gestoptOp) return `${langeDatum(start)} vanaf ${klok(start)} — niet afgesloten`;
-  const eind = new Date(bezoek.gestoptOp);
-  const duur = Math.round((eind - start) / 60000);
-  return `${langeDatum(start)} ${klok(start)} – ${klok(eind)} (${alsDuur(duur)})`;
+  const wie = schoonmakerNaam(doc(), bezoek.schoonmakerId);
+  const wanneer = bezoek.gestoptOp
+    ? `${langeDatum(start)} ${klok(start)} – ${klok(new Date(bezoek.gestoptOp))} `
+      + `(${alsDuur(Math.round((new Date(bezoek.gestoptOp) - start) / 60000))})`
+    : `${langeDatum(start)} vanaf ${klok(start)} — niet afgesloten`;
+  return wie ? `${wie} · ${wanneer}` : wanneer;
 }
 
 function toonTaakHistorie(taak) {

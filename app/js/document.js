@@ -30,7 +30,15 @@ export const RESULTAAT_LABEL = {
 export const DOCUMENT_VERSIE = 1;
 
 export function leegDocument() {
-  return { versie: DOCUMENT_VERSIE, ruimtes: [], taken: [], weken: {}, berichten: [] };
+  return {
+    versie: DOCUMENT_VERSIE,
+    ruimtes: [],
+    taken: [],
+    weken: {},
+    berichten: [],
+    schoonmakers: [],
+    instellingen: {},
+  };
 }
 
 /** Sleutel van een week: "2026-34". Sorteert op jaar en weeknummer. */
@@ -63,6 +71,8 @@ export function pasToe(doc, bewerking) {
     taken: [...(doc.taken || [])],
     weken: { ...(doc.weken || {}) },
     berichten: [...(doc.berichten || [])],
+    schoonmakers: [...(doc.schoonmakers || [])],
+    instellingen: { ...(doc.instellingen || {}) },
   };
 
   switch (bewerking.soort) {
@@ -163,13 +173,46 @@ export function pasToe(doc, bewerking) {
       };
       break;
     }
+    case 'schoonmaker.maak': {
+      if (d.schoonmakers.some((s) => s.id === bewerking.id)) break;
+      const volgorde = d.schoonmakers.reduce((max, s) => Math.max(max, s.volgorde), -1) + 1;
+      d.schoonmakers.push({ id: bewerking.id, naam: bewerking.naam, volgorde, actief: true });
+      // De eerste die je toevoegt is meteen de standaard.
+      if (!d.instellingen.standaardSchoonmaker) d.instellingen.standaardSchoonmaker = bewerking.id;
+      break;
+    }
+    case 'schoonmaker.bewerk': {
+      d.schoonmakers = d.schoonmakers.map((s) => (s.id === bewerking.id ? { ...s, ...bewerking.velden } : s));
+      // Een gearchiveerde schoonmaakster kan geen standaard blijven.
+      if (bewerking.velden?.actief === false && d.instellingen.standaardSchoonmaker === bewerking.id) {
+        const volgende = d.schoonmakers.find((s) => s.actief);
+        d.instellingen = { ...d.instellingen, standaardSchoonmaker: volgende ? volgende.id : null };
+      }
+      break;
+    }
+    case 'schoonmaker.volgorde': {
+      const plek = new Map(bewerking.ids.map((id, i) => [id, i]));
+      d.schoonmakers = d.schoonmakers.map((s) => (plek.has(s.id) ? { ...s, volgorde: plek.get(s.id) } : s));
+      break;
+    }
+    case 'instelling.zet': {
+      d.instellingen = { ...d.instellingen, [bewerking.sleutel]: bewerking.waarde };
+      break;
+    }
     case 'bezoek.start': {
       const week = zorgVoorWeek(d, bewerking.week);
       const bezoeken = week.bezoeken || [];
       // Idempotent: hetzelfde bezoek nog eens starten verandert niets.
       const nieuw = bezoeken.some((b) => b.id === bewerking.id)
-        ? bezoeken.map((b) => (b.id === bewerking.id ? { ...b, gestartOp: bewerking.tijd } : b))
-        : [...bezoeken, { id: bewerking.id, gestartOp: bewerking.tijd, gestoptOp: null }];
+        ? bezoeken.map((b) => (b.id === bewerking.id
+          ? { ...b, gestartOp: bewerking.tijd, schoonmakerId: bewerking.schoonmakerId ?? b.schoonmakerId ?? null }
+          : b))
+        : [...bezoeken, {
+          id: bewerking.id,
+          gestartOp: bewerking.tijd,
+          gestoptOp: null,
+          schoonmakerId: bewerking.schoonmakerId ?? null,
+        }];
       d.weken[bewerking.week] = { ...week, bezoeken: nieuw };
       break;
     }
@@ -235,7 +278,10 @@ function zorgVoorWeek(d, sleutel) {
 
 /** Welke bestanden raakt deze bewerking? Bepaalt wat er weggeschreven wordt. */
 export function geraakteDelen(bewerking) {
-  if (bewerking.soort.startsWith('ruimte.') || bewerking.soort.startsWith('taak.')) return ['bibliotheek'];
+  if (bewerking.soort.startsWith('ruimte.')
+    || bewerking.soort.startsWith('taak.')
+    || bewerking.soort.startsWith('schoonmaker.')
+    || bewerking.soort.startsWith('instelling.')) return ['bibliotheek'];
   if (bewerking.soort.startsWith('week')
     || bewerking.soort.startsWith('weektaak.')
     || bewerking.soort.startsWith('bezoek.')) return ['weken'];
@@ -287,6 +333,27 @@ export function haalWeek(doc, jaar, weeknummer) {
     taken: week?.taken || {},
     bezoeken: week?.bezoeken || [],
   };
+}
+
+/* ------------------------------------------------------------- schoonmakers */
+
+export function schoonmakerLijst(doc, { inclusiefGearchiveerd = false } = {}) {
+  return (doc.schoonmakers || [])
+    .filter((s) => inclusiefGearchiveerd || s.actief)
+    .sort((a, b) => a.volgorde - b.volgorde);
+}
+
+/** Wie er standaard voorgesteld wordt als er meerdere zijn. */
+export function standaardSchoonmaker(doc) {
+  const actief = schoonmakerLijst(doc);
+  if (!actief.length) return null;
+  const gekozen = actief.find((s) => s.id === doc.instellingen?.standaardSchoonmaker);
+  return gekozen || actief[0];
+}
+
+export function schoonmakerNaam(doc, id) {
+  if (!id) return null;
+  return (doc.schoonmakers || []).find((s) => s.id === id)?.naam || null;
 }
 
 /* ------------------------------------------------------------------ bezoeken */

@@ -134,12 +134,27 @@ bewaard. In de historie zie je per taak hoe vaak het echt nodig was — bijvoorb
 > raar bij *Bed opmaken*, dus ik heb het neutraler gemaakt. Andere woorden zijn
 > zo weer aangepast in `app/js/schoonmaak.js`.
 
+### Wie er werkt
+
+In het beheer voeg je schoonmaaksters toe (Takenbibliotheek → **Schoonmaaksters**)
+en wijs je er één als standaard aan. Staat er meer dan één, dan kiest zij bij het
+starten haar naam; de standaard staat alvast voor, en op haar eigen toestel staat
+haar vorige keuze voor. Is er niemand of maar één, dan valt er niets te kiezen en
+begint ze meteen.
+
+Wie er gewerkt heeft staat bij het bezoek, dus je ziet het per week terug in de
+historie: *"Anna · dinsdag 18 augustus 9:00 – 11:30 (2 uur 30)"*. Archiveer je
+iemand, dan verdwijnt ze uit haar keuzelijst maar houden oude bezoeken haar naam.
+
 ### Werktijd
 
 **Schoonmaak** — bovenaan een grote knop **Ik begin**; daarna loopt de tijd mee
 en staat er **Ik ben klaar**. Bij het afsluiten volgt een korte samenvatting:
 hoelang er gewerkt is en hoeveel taken er af zijn. Meerdere keren op een week kan
 gewoon; de tijden tellen bij elkaar op.
+
+De kop toont de dag van vandaag ("Week 35 — woensdag 26 augustus"), niet de
+maandag van de week: zij opent de lijst vandaag.
 
 Verder: de week en de notitie bovenaan, een voortgangsbalk, taken gegroepeerd per
 ruimte, grote tikbare rijen, de foto schermvullend te bekijken, een opmerking per
@@ -238,7 +253,7 @@ testen en later uit te breiden.
 ## Testen
 
 ```bash
-npm test        # 67 tests
+npm test        # 82 tests
 npm run dev     # bekijk de app lokaal op http://localhost:4321
 ```
 

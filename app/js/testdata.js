@@ -17,7 +17,10 @@ function tijdIn(jaar, weeknummer, dagOffset, uur, minuut) {
 export function maakTestDocument() {
   const doc = maakVoorbeeldDocument();
   const nu = huidigeWeek();
-  const bewerkingen = [];
+  const bewerkingen = [
+    { soort: 'schoonmaker.maak', id: 'sm-anna', naam: 'Anna' },
+    { soort: 'schoonmaker.maak', id: 'sm-fatima', naam: 'Fatima' },
+  ];
 
   const wekelijks = doc.taken.filter((t) => t.type === 'wekelijks').map((t) => t.id);
   const periodiek = doc.taken.filter((t) => t.type === 'periodiek').map((t) => t.id);
@@ -55,7 +58,11 @@ export function maakTestDocument() {
       });
     });
 
-    bewerkingen.push({ soort: 'bezoek.start', week: sleutel, id: `bz-${index}`, tijd: tijdIn(w.jaar, w.weeknummer, 1, 9, 0) });
+    bewerkingen.push({
+      soort: 'bezoek.start', week: sleutel, id: `bz-${index}`,
+      tijd: tijdIn(w.jaar, w.weeknummer, 1, 9, 0),
+      schoonmakerId: index % 3 === 0 ? 'sm-fatima' : 'sm-anna',
+    });
     bewerkingen.push({
       soort: 'bezoek.stop', week: sleutel, id: `bz-${index}`,
       tijd: tijdIn(w.jaar, w.weeknummer, 1, index % 2 === 0 ? 12 : 11, 30),

@@ -21,6 +21,8 @@ export function documentNaarBestanden(doc, delen = Object.keys(BESTANDEN)) {
       seedVersie: doc.seedVersie,
       ruimtes: doc.ruimtes,
       taken: doc.taken,
+      schoonmakers: doc.schoonmakers,
+      instellingen: doc.instellingen,
     }, null, 1);
   }
   if (delen.includes('weken')) {
@@ -49,6 +51,8 @@ export function bestandenNaarDocument(bestanden) {
     if (bib.seedVersie) doc.seedVersie = bib.seedVersie;
     doc.ruimtes = bib.ruimtes || [];
     doc.taken = bib.taken || [];
+    doc.schoonmakers = bib.schoonmakers || [];
+    doc.instellingen = bib.instellingen || {};
   }
   const weken = lees(BESTANDEN.weken);
   if (weken) doc.weken = weken.weken || {};
@@ -171,9 +175,12 @@ export class Opslag extends EventTarget {
    * drie keer aan-en-uit tikken één verzoek oplevert.
    */
   doe(bewerking, { vervangSleutel = null } = {}) {
-    const item = { ...bewerking, tijd: bewerking.tijd || this.nu(), sleutel: vervangSleutel };
+    // Let op de veldnaam: dit is administratie van de wachtrij zelf. Hij mag
+    // niet botsen met een veld uit de bewerking (een bewerking heeft soms een
+    // eigen `sleutel`, bijvoorbeeld bij het zetten van een instelling).
+    const item = { ...bewerking, tijd: bewerking.tijd || this.nu(), _vervang: vervangSleutel };
     if (vervangSleutel) {
-      const index = this.wachtrij.findIndex((b) => b.sleutel === vervangSleutel);
+      const index = this.wachtrij.findIndex((b) => b._vervang === vervangSleutel);
       if (index >= 0) this.wachtrij[index] = item;
       else this.wachtrij.push(item);
     } else {

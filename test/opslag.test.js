@@ -341,3 +341,47 @@ test('bewerken in de testmodus wist de voorbeeldgegevens niet', async () => {
   const opnieuw = new Opslag({ test: true, rol: 'beheerder', dataGist: null, fotoGist: null, sleutel: null });
   assert.equal((await opnieuw.begin()).taken[0].titel, 'Zelf aangepast');
 });
+
+test('schoonmaaksters en de standaard worden bewaard in de Gist', async () => {
+  const opslag = nieuweOpslag();
+  await opslag.begin();
+  opslag.doe({ soort: 'schoonmaker.maak', id: 's1', naam: 'Anna' });
+  opslag.doe({ soort: 'schoonmaker.maak', id: 's2', naam: 'Fatima' });
+  opslag.doe({ soort: 'instelling.zet', sleutel: 'standaardSchoonmaker', waarde: 's2' });
+  await opslag.verstuur();
+
+  const doc = await nieuweOpslag().begin();
+  assert.deepEqual(doc.schoonmakers.map((s) => s.naam), ['Anna', 'Fatima']);
+  assert.equal(doc.instellingen.standaardSchoonmaker, 's2');
+});
+
+test('wie er werkte gaat mee over de apparaten heen', async () => {
+  const laptop = nieuweOpslag('beheerder');
+  await laptop.begin();
+  laptop.doe({ soort: 'schoonmaker.maak', id: 's1', naam: 'Anna' });
+  await laptop.verstuur();
+
+  const telefoon = nieuweOpslag('schoonmaakster');
+  await telefoon.begin();
+  const week = weekSleutel(2026, 34);
+  telefoon.doe({ soort: 'bezoek.start', week, id: 'b1', tijd: 't1', schoonmakerId: 's1' });
+  await telefoon.verstuur();
+
+  const doc = await nieuweOpslag().begin();
+  assert.equal(doc.weken[week].bezoeken[0].schoonmakerId, 's1');
+});
+
+test('de wachtrij laat velden van een bewerking met rust', async () => {
+  // De wachtrij houdt zelf administratie bij; die mag niet over de inhoud van
+  // een bewerking heen schrijven.
+  const opslag = nieuweOpslag();
+  await opslag.begin();
+  opslag.doe({ soort: 'instelling.zet', sleutel: 'standaardSchoonmaker', waarde: 'abc' });
+
+  const item = opslag.wachtrij[0];
+  assert.equal(item.sleutel, 'standaardSchoonmaker', 'de bewerking houdt zijn eigen sleutel');
+
+  await opslag.verstuur();
+  const doc = await nieuweOpslag().begin();
+  assert.deepEqual(doc.instellingen, { standaardSchoonmaker: 'abc' });
+});

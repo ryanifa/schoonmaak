@@ -9,6 +9,7 @@ import { toonModaal } from './modaal.js';
 import { meld } from './melding.js';
 import {
   weekOverzicht, weekSleutel, nieuwId, lopendBezoek, gewerkteMinuten, vergetenBezoeken, alsDuur,
+  schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam,
 } from './document.js';
 import { toonTestbalkIndienNodig } from './testbanner.js';
 import { huidigeWeek } from './week.js';
@@ -147,11 +148,13 @@ function tekenWerkblok() {
   if (lopend) {
     const sinds = new Date(lopend.gestartOp);
     const klok = el('div', { class: 'klok', tekst: minuten < 1 ? 'net begonnen' : alsDuur(minuten) });
+    const wie = schoonmakerNaam(opslag.document(), lopend.schoonmakerId);
     doel.append(el('div', { class: 'werkblok bezig' }, [
       klok,
       el('div', {
         class: 'sinds',
-        tekst: `bezig sinds ${sinds.getHours()}:${String(sinds.getMinutes()).padStart(2, '0')}`,
+        tekst: [wie, `bezig sinds ${sinds.getHours()}:${String(sinds.getMinutes()).padStart(2, '0')}`]
+          .filter(Boolean).join(' · '),
       }),
       el('button', { class: 'knop primair vol', type: 'button', tekst: '✓ Ik ben klaar', onclick: meldKlaar }),
     ]));
@@ -189,13 +192,58 @@ function tekenWerkblok() {
   ]));
 }
 
+const WIE_SLEUTEL = `schoonmaak.wie.${toegang?.dataGist || 'test'}`;
+
+function laatstGekozen() {
+  try {
+    return localStorage.getItem(WIE_SLEUTEL);
+  } catch {
+    return null;
+  }
+}
+
+function onthoudKeuze(id) {
+  try {
+    if (id) localStorage.setItem(WIE_SLEUTEL, id);
+  } catch { /* privémodus: dan alleen deze keer */ }
+}
+
 function startWerk() {
+  const d = opslag.document();
+  const mensen = schoonmakerLijst(d);
+  // Niemand of maar één: dan valt er niets te kiezen.
+  if (mensen.length <= 1) return beginBezoek(mensen[0]?.id ?? null);
+  kiesWie(d, mensen);
+}
+
+function beginBezoek(schoonmakerId) {
   if (navigator.vibrate) navigator.vibrate(15);
+  onthoudKeuze(schoonmakerId);
   opslag.doe({
     soort: 'bezoek.start',
     week: huidigeWeekSleutel(),
     id: nieuwId('bz'),
     tijd: new Date().toISOString(),
+    schoonmakerId,
+  });
+}
+
+/** Wie begint er? Haar laatste keuze op dit toestel staat voor. */
+function kiesWie(d, mensen) {
+  const vorige = laatstGekozen();
+  const voorgesteld = mensen.find((p) => p.id === vorige)?.id || standaardSchoonmaker(d)?.id || mensen[0].id;
+
+  const modaal = toonModaal({
+    titel: 'Wie begint er?',
+    inhoud: [
+      el('div', { class: 'wie-lijst' }, mensen.map((persoon) => el('button', {
+        class: `knop vol${persoon.id === voorgesteld ? ' primair' : ''}`,
+        type: 'button',
+        tekst: persoon.naam,
+        onclick: () => { beginBezoek(persoon.id); modaal.sluit(); },
+      }))),
+    ],
+    knoppen: [{ tekst: 'Annuleren', bij: () => modaal.sluit() }],
   });
 }
 
