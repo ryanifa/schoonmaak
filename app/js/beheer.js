@@ -28,6 +28,7 @@ let fotos = null;
 let tab = 'week';
 let week = huidigeWeek();
 let toonGearchiveerd = false;
+let gelezenVersie = null;
 
 const scherm = () => $('#scherm');
 const doc = () => opslag.document();
@@ -127,7 +128,21 @@ function teken() {
     else if (tab === 'bibliotheek') tekenBibliotheek();
     else if (tab === 'historie') tekenHistorie();
     else tekenBerichten();
+    tekenVoetregel();
   });
+}
+
+/** Welke versie draait hier? Hoort op elk tabblad te staan, niet op één. */
+function tekenVoetregel() {
+  const regel = el('p', { class: 'voetregel', id: 'versieregel', tekst: gelezenVersie || '' });
+  scherm().append(regel);
+  if (!gelezenVersie) {
+    versieRegel().then((tekst) => {
+      gelezenVersie = tekst;
+      const knoop = $('#versieregel');
+      if (knoop) knoop.textContent = tekst;
+    });
+  }
 }
 
 function werkBerichtenTelBij() {
@@ -722,11 +737,6 @@ function tekenHistorie() {
   ]));
 
   doel.append(tekenOpruimen());
-  doel.append(el('p', { class: 'voetregel', id: 'versieregel' }));
-  versieRegel().then((regel) => {
-    const knoop = $('#versieregel');
-    if (knoop) knoop.textContent = regel;
-  });
 }
 
 /* Opruimen: de historie leegmaken na het uitproberen. */

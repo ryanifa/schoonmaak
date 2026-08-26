@@ -252,14 +252,21 @@ testen en later uit te breiden.
 
 ## Versie en opruimen
 
-Onderaan de beheerpagina en de inrichtingspagina staat welke versie er draait —
-het commit-nummer plus de publicatiedatum. Dat stempelt de workflow bij het
+Onderaan elk tabblad van het beheer en op de inrichtingspagina staat welke versie
+er draait — het commit-nummer plus de publicatiedatum. Dat stempelt de workflow bij het
 publiceren in `versie.json`, en tegelijk in de cachenaam van de service worker.
 
 Dat laatste is belangrijk: eerder stond die naam vast, waardoor je browser na een
 publicatie de oude app bleef serveren tot je hard verversde. Nu vervalt de oude
 cache vanzelf, en verschijnt er onderin een balkje **"Er staat een nieuwe versie
 klaar — Vernieuwen"** zodra dat zo is.
+
+De service worker haalt pagina's en code bovendien **eerst van het netwerk** en
+pas bij geen bereik uit de cache. Daarvoor was het andersom, waardoor je een
+nieuwe versie altijd één herlaadbeurt te laat zag. Plaatjes komen nog wel uit de
+cache: die veranderen toch niet. Er is een test die een publicatie nabootst en
+controleert dat de wijziging meteen binnenkomt én dat de app offline blijft
+openen.
 
 **Historie wissen.** Onderaan het tabblad *Historie* staat een knop om alles weg
 te gooien wat je tijdens het uitproberen hebt opgebouwd: weken, afvinkjes,
