@@ -13,7 +13,7 @@ import {
 import { toonTestbalkIndienNodig } from './testbanner.js';
 import { huidigeWeek } from './week.js';
 import {
-  el, leeg, voegToe, $, weekTitel, tijdstempel, meervoud, vinkIcoon,
+  el, leeg, voegToe, behoudPlek, $, weekTitel, tijdstempel, meervoud, vinkIcoon,
 } from './util.js';
 
 const toegang = haalToegang('schoonmaakster');
@@ -84,6 +84,10 @@ function toonLaadfout(fout) {
 
 function teken() {
   if (!opslag?.geladen) return;
+  behoudPlek(tekenNu);
+}
+
+function tekenNu() {
   overzicht = weekOverzicht(opslag.document(), nu.jaar, nu.weeknummer);
   const { week, groepen, voortgang } = overzicht;
 
@@ -298,7 +302,7 @@ function tekenTaak(taak) {
     }),
   ]);
 
-  return el('li', { class: `taak${taak.afgevinkt ? ' gedaan' : ''}` }, [
+  return el('li', { class: `taak${taak.afgevinkt ? ' gedaan' : ''}`, dataset: { taak: taak.taakId } }, [
     el('div', { class: 'taak-hoofd' }, [rij, fotoKnop]),
     voet,
   ]);
@@ -347,7 +351,7 @@ function tekenOpruimtaak(taak) {
       onclick: () => kiesResultaat(taak, soort),
     })));
 
-  return el('li', { class: `taak${gekozen ? ' gedaan' : ''}` }, [
+  return el('li', { class: `taak${gekozen ? ' gedaan' : ''}`, dataset: { taak: taak.taakId } }, [
     kop,
     keuze,
     el('div', { class: 'taak-voet' }, [

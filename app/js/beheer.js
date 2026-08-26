@@ -16,7 +16,7 @@ import {
 import { toonTestbalkIndienNodig } from './testbanner.js';
 import { huidigeWeek } from './week.js';
 import {
-  el, leeg, voegToe, $, $$, langeDatum, korteDatum, tijdstempel,
+  el, leeg, voegToe, behoudPlek, naarBoven, $, $$, langeDatum, korteDatum, tijdstempel,
   wekenGeledenTekst, meervoud, vinkIcoon, verkleinAfbeelding, alsBase64,
 } from './util.js';
 
@@ -99,7 +99,7 @@ function kiesTab(nieuw) {
   tab = nieuw;
   location.hash = nieuw;
   teken();
-  window.scrollTo(0, 0);
+  naarBoven();
 }
 
 function toonFout(fout) {
@@ -118,12 +118,14 @@ function toonFout(fout) {
 
 function teken() {
   if (!opslag?.geladen) return;
-  for (const knop of $$('.tab')) knop.setAttribute('aria-selected', String(knop.dataset.tab === tab));
-  werkBerichtenTelBij();
-  if (tab === 'week') tekenWeek();
-  else if (tab === 'bibliotheek') tekenBibliotheek();
-  else if (tab === 'historie') tekenHistorie();
-  else tekenBerichten();
+  behoudPlek(() => {
+    for (const knop of $$('.tab')) knop.setAttribute('aria-selected', String(knop.dataset.tab === tab));
+    werkBerichtenTelBij();
+    if (tab === 'week') tekenWeek();
+    else if (tab === 'bibliotheek') tekenBibliotheek();
+    else if (tab === 'historie') tekenHistorie();
+    else tekenBerichten();
+  });
 }
 
 function werkBerichtenTelBij() {
@@ -254,7 +256,10 @@ function tekenSamenstellerTaak(sam, alle, taak) {
     ]),
   ];
 
-  return el('li', { class: `taak${taak.geselecteerd ? ' gekozen' : ''}${taak.vast ? ' vast' : ''}` }, [
+  return el('li', {
+    class: `taak${taak.geselecteerd ? ' gekozen' : ''}${taak.vast ? ' vast' : ''}`,
+    dataset: { taak: taak.id },
+  }, [
     el('div', { class: 'taak-hoofd' }, [
       taak.vast
         ? el('div', { class: 'taak-rij', stijl: { cursor: 'default' }, title: 'Opruimtaken staan altijd op de weeklijst' }, binnenkant)
@@ -337,7 +342,7 @@ function tekenBibliotheek() {
 
 function tekenBibliotheekTaak(taak, lijst, index) {
   const fotoUrl = taak.fotoId ? fotos.url(taak.fotoId) : null;
-  return el('li', { class: `taak${taak.actief ? '' : ' gearchiveerd'}` }, [
+  return el('li', { class: `taak${taak.actief ? '' : ' gearchiveerd'}`, dataset: { taak: taak.id } }, [
     el('div', { class: 'taak-hoofd' }, [
       el('button', { class: 'taak-rij', type: 'button', onclick: () => bewerkTaak(taak) }, [
         el('span', { class: 'taak-midden' }, [

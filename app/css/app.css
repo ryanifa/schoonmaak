@@ -112,6 +112,10 @@ a { color: var(--accent-donker); }
 .ruimte-kop h2 { font-size: 1.05rem; }
 .ruimte-kop .aantal { color: var(--inkt-zacht); font-size: .85rem; margin-left: auto; }
 
+/* Wij zetten de scrollpositie zelf terug na het opnieuw tekenen; de browser
+   hoeft er niet ook nog aan te trekken. */
+.taaklijst, .omhulsel { overflow-anchor: none; }
+
 .taaklijst { list-style: none; margin: 0; padding: 0; background: var(--vlak); border: 1px solid var(--rand); border-radius: var(--radius); box-shadow: var(--schaduw); overflow: hidden; }
 .taaklijst > li + li { border-top: 1px solid var(--rand); }
 

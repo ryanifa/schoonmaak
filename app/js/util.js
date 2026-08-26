@@ -34,6 +34,55 @@ export function voegToe(knoop, ...kinderen) {
   return knoop;
 }
 
+/**
+ * Voert `tekenen` uit en zorgt dat de gebruiker op zijn plek blijft.
+ *
+ * De weergaven bouwen bij elke wijziging het hele scherm opnieuw op. Wat er dan
+ * met de scrollpositie en de toetsenbordfocus gebeurt, laten browsers aan hun
+ * eigen heuristiek over — en die verschilt per browser. Daarom regelen we het
+ * hier zelf: positie onthouden, opnieuw tekenen, positie terugzetten.
+ *
+ * Rijen met een `data-taak`-kenmerk worden herkend, zodat de knop waarop net
+ * geklikt is ook na het opnieuw tekenen de focus houdt.
+ */
+let herstelToken = 0;
+
+export function behoudPlek(tekenen) {
+  const mijnToken = ++herstelToken;
+  const y = window.scrollY;
+  const actief = document.activeElement;
+  const rij = actief?.closest?.('[data-taak]');
+  const merk = rij ? { taak: rij.dataset.taak, klasse: actief.className, tekst: actief.textContent } : null;
+
+  tekenen();
+
+  const terug = () => {
+    // Is er intussen bewust ergens anders heen gescrold, dan niet meer bijsturen.
+    if (mijnToken !== herstelToken) return;
+    if (Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y);
+  };
+  terug();
+  // Nog een keer na de volgende frame, voor het geval de browser zelf bijstuurt.
+  requestAnimationFrame(terug);
+
+  if (merk) herstelFocus(merk);
+}
+
+function herstelFocus({ taak, klasse, tekst }) {
+  const rij = document.querySelector(`[data-taak="${CSS.escape(taak)}"]`);
+  if (!rij) return;
+  const kandidaten = [...rij.querySelectorAll('button')];
+  const zelfde = kandidaten.find((k) => k.className === klasse && k.textContent === tekst)
+    || kandidaten.find((k) => k.className === klasse);
+  zelfde?.focus({ preventScroll: true });
+}
+
+/** Naar boven springen, en een eventueel gepland herstel annuleren. */
+export function naarBoven() {
+  herstelToken += 1;
+  window.scrollTo(0, 0);
+}
+
 export const $ = (selector, wortel = document) => wortel.querySelector(selector);
 export const $$ = (selector, wortel = document) => [...wortel.querySelectorAll(selector)];
 
