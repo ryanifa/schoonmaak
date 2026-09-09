@@ -4,7 +4,8 @@ import {
   leegDocument, pasToe, speelAf, weekSleutel, nieuwId, weekOverzicht, weekSamensteller,
   historie, taakHistorie, alleOpmerkingen, aantalOngelezen, takenVanVorigeWeek,
   ruimteLijst, taakLijst, laatstGedaan, haalWeek,
-  lopendBezoek, gewerkteMinuten, vergetenBezoeken, alsDuur,
+  lopendBezoek, gewerkteMinuten, alsDuur, bezoekMinuten,
+  autoStopBewerkingen, herinneringNummer, automatischGestopteBezoeken, werktijden, WERKTIJD,
   altijdOpDeLijst, resultaatTelling, TAAKTYPES,
   schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam, historieOmvang,
 } from '../app/js/document.js';
@@ -272,13 +273,12 @@ test('een bezoek dat nog loopt telt mee tot nu', () => {
   assert.equal(gewerkteMinuten(haalWeek(doc, 2026, 34), nu), 90);
 });
 
-test('een vergeten bezoek van een eerdere dag telt niet mee', () => {
+test('een lopend bezoek telt nooit langer dan de grens', () => {
   const nu = new Date('2026-08-20T11:00:00');
   let doc = leegDocument();
   doc = pasToe(doc, { soort: 'bezoek.start', week: W34, id: 'v1', tijd: '2026-08-18T09:00:00' });
-  const week = haalWeek(doc, 2026, 34);
-  assert.equal(gewerkteMinuten(week, nu), 0, 'anders zou er een absurd aantal uren staan');
-  assert.equal(vergetenBezoeken(week, nu).length, 1, 'maar het wordt wel gemeld');
+  // Twee dagen geleden begonnen: zonder grens zou hier een absurd getal staan.
+  assert.equal(gewerkteMinuten(haalWeek(doc, 2026, 34), nu), WERKTIJD.stopNa);
 });
 
 test('stoppen zonder start doet niets', () => {
@@ -657,4 +657,88 @@ test('historieOmvang telt wat er weggaat', () => {
   assert.equal(omvang.aantalOpmerkingen, 1);
   assert.equal(omvang.aantalBezoeken, 1);
   assert.equal(omvang.aantalBerichten, 1);
+});
+
+/* ------------------------------------------- herinneren en vanzelf stoppen --- */
+
+const START = '2026-08-26T08:00:00';
+const naUur = (u) => new Date(new Date(START).getTime() + u * 3600000);
+
+function metLopendBezoek() {
+  return pasToe(leegDocument(), { soort: 'bezoek.start', week: W34, id: 'bz', tijd: START });
+}
+
+test('de eerste herinnering komt na drie uur, daarna elk uur', () => {
+  const bezoek = haalWeek(metLopendBezoek(), 2026, 34).bezoeken[0];
+  assert.equal(herinneringNummer(bezoek, naUur(1)), null);
+  assert.equal(herinneringNummer(bezoek, naUur(2.9)), null, 'net voor drie uur nog niet');
+  assert.equal(herinneringNummer(bezoek, naUur(3)), 1);
+  assert.equal(herinneringNummer(bezoek, naUur(3.9)), 1, 'binnen het uur blijft het dezelfde');
+  assert.equal(herinneringNummer(bezoek, naUur(4)), 2);
+  assert.equal(herinneringNummer(bezoek, naUur(5)), 3);
+});
+
+test('een afgesloten bezoek herinnert nergens meer aan', () => {
+  let doc = metLopendBezoek();
+  doc = pasToe(doc, { soort: 'bezoek.stop', week: W34, id: 'bz', tijd: naUur(1).toISOString() });
+  assert.equal(herinneringNummer(haalWeek(doc, 2026, 34).bezoeken[0], naUur(9)), null);
+});
+
+test('na vijf uur sluit de app het bezoek zelf af', () => {
+  let doc = metLopendBezoek();
+  assert.deepEqual(autoStopBewerkingen(doc, naUur(4.9)), [], 'daarvoor gebeurt er niets');
+
+  const bewerkingen = autoStopBewerkingen(doc, naUur(5.1));
+  assert.equal(bewerkingen.length, 1);
+  doc = speelAf(doc, bewerkingen);
+
+  const bezoek = haalWeek(doc, 2026, 34).bezoeken[0];
+  assert.equal(bezoek.gestoptOp, naUur(5).toISOString(), 'precies op de grens, niet op "nu"');
+  assert.equal(bezoek.automatisch, true);
+  assert.equal(gewerkteMinuten(haalWeek(doc, 2026, 34), naUur(9)), 300);
+});
+
+test('de eindtijd komt uit de starttijd, dus elk apparaat rekent hetzelfde uit', () => {
+  const doc = metLopendBezoek();
+  const telefoon = autoStopBewerkingen(doc, naUur(5.2));
+  const laptop = autoStopBewerkingen(doc, naUur(7.8));
+  assert.deepEqual(telefoon, laptop, 'wie het als eerste opent maakt niet uit');
+});
+
+test('vanzelf afsluiten is veilig om opnieuw af te spelen', () => {
+  const doc = metLopendBezoek();
+  const bewerkingen = autoStopBewerkingen(doc, naUur(6));
+  const eenmaal = speelAf(doc, bewerkingen);
+  assert.deepEqual(speelAf(eenmaal, bewerkingen), eenmaal);
+  assert.deepEqual(autoStopBewerkingen(eenmaal, naUur(9)), [], 'en er komt niets bij');
+});
+
+test('een vanzelf afgesloten bezoek is als zodanig herkenbaar', () => {
+  let doc = metLopendBezoek();
+  doc = speelAf(doc, autoStopBewerkingen(doc, naUur(6)));
+  const week = haalWeek(doc, 2026, 34);
+  assert.equal(automatischGestopteBezoeken(week).length, 1);
+
+  // Zelf op "klaar" tikken levert geen markering op.
+  let netjes = metLopendBezoek();
+  netjes = pasToe(netjes, { soort: 'bezoek.stop', week: W34, id: 'bz', tijd: naUur(2).toISOString() });
+  assert.equal(automatischGestopteBezoeken(haalWeek(netjes, 2026, 34)).length, 0);
+});
+
+test('de tijden zijn per huishouden aan te passen', () => {
+  let doc = metLopendBezoek();
+  doc = pasToe(doc, { soort: 'instelling.zet', sleutel: 'stopNa', waarde: 120 });
+  doc = pasToe(doc, { soort: 'instelling.zet', sleutel: 'herinnerNa', waarde: 60 });
+
+  assert.equal(werktijden(doc).stopNa, 120);
+  const bezoek = haalWeek(doc, 2026, 34).bezoeken[0];
+  assert.equal(herinneringNummer(bezoek, naUur(1), werktijden(doc)), 1, 'nu al na een uur');
+  assert.equal(autoStopBewerkingen(doc, naUur(2.5)).length, 1, 'en na twee uur dicht');
+});
+
+test('bezoekMinuten begrenst één bezoek', () => {
+  const bezoek = { gestartOp: START, gestoptOp: null };
+  assert.equal(Math.round(bezoekMinuten(bezoek, naUur(2))), 120);
+  assert.equal(Math.round(bezoekMinuten(bezoek, naUur(8))), WERKTIJD.stopNa);
+  assert.equal(bezoekMinuten({ gestartOp: null }, naUur(2)), 0);
 });

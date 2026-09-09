@@ -27,6 +27,26 @@ export const RESULTAAT_LABEL = {
   zelf_gedaan: 'heeft zij gedaan',
 };
 
+/**
+ * Werktijden, in minuten. Er is geen server die kan meekijken, dus alles wordt
+ * afgeleid uit de starttijd van het bezoek. Daardoor rekent elk apparaat
+ * hetzelfde uit en blijft opnieuw afspelen veilig.
+ */
+export const WERKTIJD = {
+  herinnerNa: 3 * 60,   // eerste herinnering
+  herinnerElke: 60,     // en daarna elk uur opnieuw
+  stopNa: 5 * 60,       // hierna sluit de app het bezoek zelf af
+};
+
+export function werktijden(doc) {
+  const i = doc?.instellingen || {};
+  return {
+    herinnerNa: Number(i.herinnerNa) > 0 ? Number(i.herinnerNa) : WERKTIJD.herinnerNa,
+    herinnerElke: Number(i.herinnerElke) > 0 ? Number(i.herinnerElke) : WERKTIJD.herinnerElke,
+    stopNa: Number(i.stopNa) > 0 ? Number(i.stopNa) : WERKTIJD.stopNa,
+  };
+}
+
 export const DOCUMENT_VERSIE = 1;
 
 export function leegDocument() {
@@ -222,7 +242,9 @@ export function pasToe(doc, bewerking) {
       if (!bezoeken.some((b) => b.id === bewerking.id)) break;
       d.weken[bewerking.week] = {
         ...week,
-        bezoeken: bezoeken.map((b) => (b.id === bewerking.id ? { ...b, gestoptOp: bewerking.tijd } : b)),
+        bezoeken: bezoeken.map((b) => (b.id === bewerking.id
+          ? { ...b, gestoptOp: bewerking.tijd, automatisch: !!bewerking.automatisch }
+          : b)),
       };
       break;
     }
@@ -375,35 +397,69 @@ export function lopendBezoek(week) {
 }
 
 /**
- * Gewerkte minuten in een week. Een bezoek dat nog loopt telt mee tot `nu`.
- * Bezoeken zonder eindtijd van een eerdere dag laten we buiten beschouwing —
- * dan is er vergeten op "klaar" te tikken, en een telling van uren zou onzin zijn.
+ * Gewerkte minuten in een week. Een bezoek dat nog loopt telt mee tot `nu`,
+ * maar nooit langer dan `stopNa`: na die tijd sluit de app het bezoek zelf af.
  */
-export function gewerkteMinuten(week, nu = new Date()) {
+export function gewerkteMinuten(week, nu = new Date(), stopNa = WERKTIJD.stopNa) {
   let totaal = 0;
   for (const bezoek of week.bezoeken || []) {
-    if (!bezoek.gestartOp) continue;
-    const start = new Date(bezoek.gestartOp);
-    if (Number.isNaN(start.getTime())) continue;
-    if (bezoek.gestoptOp) {
-      const eind = new Date(bezoek.gestoptOp);
-      if (!Number.isNaN(eind.getTime()) && eind > start) totaal += (eind - start) / 60000;
-    } else if (zelfdeDag(start, nu) && nu > start) {
-      totaal += (nu - start) / 60000;
-    }
+    const minuten = bezoekMinuten(bezoek, nu, stopNa);
+    if (minuten) totaal += minuten;
   }
   return Math.round(totaal);
 }
 
-/** Bezoeken die nooit zijn afgesloten en van een eerdere dag zijn. */
-export function vergetenBezoeken(week, nu = new Date()) {
-  return (week.bezoeken || []).filter(
-    (b) => b.gestartOp && !b.gestoptOp && !zelfdeDag(new Date(b.gestartOp), nu),
-  );
+/** Hoelang één bezoek duurde (of tot nu toe duurt), begrensd op `stopNa`. */
+export function bezoekMinuten(bezoek, nu = new Date(), stopNa = WERKTIJD.stopNa) {
+  if (!bezoek?.gestartOp) return 0;
+  const start = new Date(bezoek.gestartOp);
+  if (Number.isNaN(start.getTime())) return 0;
+  const eind = bezoek.gestoptOp ? new Date(bezoek.gestoptOp) : nu;
+  if (Number.isNaN(eind.getTime()) || eind <= start) return 0;
+  return Math.min((eind - start) / 60000, stopNa);
 }
 
-function zelfdeDag(a, b) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+/** Bezoeken die de app zelf heeft afgesloten omdat er niet op "klaar" is getikt. */
+export function automatischGestopteBezoeken(week) {
+  return (week.bezoeken || []).filter((b) => b.automatisch);
+}
+
+/**
+ * Loopt er een bezoek al langer dan `stopNa`? Dan levert dit de bewerking op om
+ * het af te sluiten. De eindtijd komt uit de starttijd en niet uit `nu`, zodat
+ * elk apparaat op dezelfde uitkomst komt.
+ */
+export function autoStopBewerkingen(doc, nu = new Date()) {
+  const { stopNa } = werktijden(doc);
+  const bewerkingen = [];
+  for (const [sleutel, week] of Object.entries(doc.weken || {})) {
+    for (const bezoek of week.bezoeken || []) {
+      if (!bezoek.gestartOp || bezoek.gestoptOp) continue;
+      const start = new Date(bezoek.gestartOp);
+      if (Number.isNaN(start.getTime())) continue;
+      const grens = new Date(start.getTime() + stopNa * 60000);
+      if (nu < grens) continue;
+      bewerkingen.push({
+        soort: 'bezoek.stop',
+        week: sleutel,
+        id: bezoek.id,
+        tijd: grens.toISOString(),
+        automatisch: true,
+      });
+    }
+  }
+  return bewerkingen;
+}
+
+/**
+ * De hoeveelste herinnering is er nu aan de beurt? Eerst na `herinnerNa`, daarna
+ * elke `herinnerElke` minuten. `null` als er nog niets te melden valt.
+ */
+export function herinneringNummer(bezoek, nu = new Date(), tijden = WERKTIJD) {
+  if (!bezoek?.gestartOp || bezoek.gestoptOp) return null;
+  const minuten = (nu - new Date(bezoek.gestartOp)) / 60000;
+  if (!(minuten >= tijden.herinnerNa)) return null;
+  return Math.floor((minuten - tijden.herinnerNa) / tijden.herinnerElke) + 1;
 }
 
 /** "1 uur 45" / "35 min" */
@@ -529,7 +585,7 @@ export function historie(doc, limiet = 12) {
         gepland: standen.length,
         afgevinkt: standen.filter((s) => s.afgevinkt).length,
         bezoeken: week.bezoeken || [],
-        gewerkteMinuten: gewerkteMinuten(week),
+        gewerkteMinuten: gewerkteMinuten(week, new Date(), werktijden(doc).stopNa),
       };
     })
     .filter((w) => w.gepland > 0 || w.notitie || w.bezoeken.length)

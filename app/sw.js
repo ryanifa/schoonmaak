@@ -31,6 +31,7 @@ const SCHIL = [
   './js/util.js',
   './js/versie.js',
   './js/week.js',
+  './js/werktijd.js',
   './versie.json',
 ];
 

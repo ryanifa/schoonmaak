@@ -8,9 +8,11 @@ import { toonFoto } from './fotoscherm.js';
 import { toonModaal } from './modaal.js';
 import { meld } from './melding.js';
 import {
-  weekOverzicht, weekSleutel, nieuwId, lopendBezoek, gewerkteMinuten, vergetenBezoeken, alsDuur,
+  weekOverzicht, weekSleutel, nieuwId, lopendBezoek, gewerkteMinuten, alsDuur,
+  automatischGestopteBezoeken, herinneringNummer, werktijden,
   schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam,
 } from './document.js';
+import { sluitVergetenBezoeken, alGezien, onthoudGezien } from './werktijd.js';
 import { toonTestbalkIndienNodig } from './testbanner.js';
 import { huidigeWeek } from './week.js';
 import {
@@ -44,6 +46,7 @@ async function begin() {
   } catch (fout) {
     return toonLaadfout(fout);
   }
+  sluitVergetenBezoeken(opslag);
   teken();
   laadBenodigdeFotos();
 
@@ -51,6 +54,7 @@ async function begin() {
   const ververs = () => {
     if (document.visibilityState !== 'visible') return;
     nu = huidigeWeek();
+    sluitVergetenBezoeken(opslag);
     opslag.ververs().then(laadBenodigdeFotos).catch(() => {});
   };
   document.addEventListener('visibilitychange', ververs);
@@ -140,7 +144,6 @@ function tekenWerkblok() {
   const doel = leeg($('#werk'));
   const week = overzicht.week;
   const lopend = lopendBezoek(week);
-  const vergeten = vergetenBezoeken(week);
   const minuten = gewerkteMinuten(week);
 
   clearInterval(klokTimer);
@@ -156,12 +159,16 @@ function tekenWerkblok() {
         tekst: [wie, `bezig sinds ${sinds.getHours()}:${String(sinds.getMinutes()).padStart(2, '0')}`]
           .filter(Boolean).join(' · '),
       }),
+      tekenHerinnering(lopend),
       el('button', { class: 'knop primair vol', type: 'button', tekst: '✓ Ik ben klaar', onclick: meldKlaar }),
     ]));
-    // De klok loopt door zolang deze weergave in beeld is.
+    // De klok loopt door zolang deze weergave in beeld is; ondertussen kijken we
+    // of er een herinnering aan de beurt is of dat de tijd om is.
     klokTimer = setInterval(() => {
       const gelopen = gewerkteMinuten(overzicht.week);
       klok.textContent = gelopen < 1 ? 'net begonnen' : alsDuur(gelopen);
+      if (sluitVergetenBezoeken(opslag)) return;             // teken() volgt vanzelf
+      if (herinneringNummer(lopend, new Date(), tijden()) > alGezien(lopend.id)) teken();
     }, 20000);
     return;
   }
@@ -169,6 +176,7 @@ function tekenWerkblok() {
   // Of ze al gewerkt heeft, hangt af van afgeronde bezoeken — niet van de
   // opgetelde minuten. Anders zou een korte beurt spoorloos verdwijnen.
   const afgerond = (week.bezoeken || []).filter((b) => b.gestoptOp);
+  const automatisch = automatischGestopteBezoeken(week);
 
   doel.append(el('div', { class: 'werkblok' }, [
     afgerond.length
@@ -186,8 +194,11 @@ function tekenWerkblok() {
       tekst: afgerond.length ? '▶ Opnieuw beginnen' : '▶ Ik begin',
       onclick: startWerk,
     }),
-    vergeten.length
-      ? el('p', { class: 'hulp', tekst: 'Een eerdere keer is niet afgesloten. Die tijd is niet meegeteld.' })
+    automatisch.length
+      ? el('p', {
+        class: 'hulp',
+        tekst: `Een eerdere keer is niet op "klaar" gezet. Die is na ${alsDuur(tijden().stopNa)} vanzelf afgesloten.`,
+      })
       : null,
   ]));
 }
@@ -206,6 +217,37 @@ function onthoudKeuze(id) {
   try {
     if (id) localStorage.setItem(WIE_SLEUTEL, id);
   } catch { /* privémodus: dan alleen deze keer */ }
+}
+
+function tijden() {
+  return werktijden(opslag.document());
+}
+
+/**
+ * Na drie uur even vragen of ze klaar is, en daarna elk uur opnieuw. Bewust
+ * geen venster dat het scherm overneemt: ze is aan het werk.
+ */
+function tekenHerinnering(lopend) {
+  const t = tijden();
+  const nummer = herinneringNummer(lopend, new Date(), t);
+  if (!nummer || nummer <= alGezien(lopend.id)) return null;
+
+  const bezig = Math.round((new Date() - new Date(lopend.gestartOp)) / 60000);
+  const resterend = Math.max(0, t.stopNa - bezig);
+
+  return el('div', { class: 'herinnering' }, [
+    el('p', { tekst: `Je bent al ${alsDuur(bezig)} bezig. Ben je klaar?` }),
+    el('p', {
+      class: 'hulp',
+      tekst: resterend
+        ? `Over ${alsDuur(resterend)} sluit de app dit vanzelf af.`
+        : 'De app sluit dit nu vanzelf af.',
+    }),
+    el('button', {
+      class: 'knop klein', type: 'button', tekst: 'Nog even door',
+      onclick: () => { onthoudGezien(lopend.id, nummer); teken(); },
+    }),
+  ]);
 }
 
 function startWerk() {

@@ -13,7 +13,9 @@ import {
   weekSamensteller, historie, taakHistorie, alleOpmerkingen, aantalOngelezen,
   takenVanVorigeWeek, lopendBezoek, gewerkteMinuten, alsDuur, haalWeek,
   schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam, historieOmvang, groepeerPerRuimte,
+  bezoekMinuten, werktijden,
 } from './document.js';
+import { sluitVergetenBezoeken } from './werktijd.js';
 import { versieRegel } from './versie.js';
 import { toonTestbalkIndienNodig } from './testbanner.js';
 import { huidigeWeek } from './week.js';
@@ -78,11 +80,15 @@ async function begin() {
     const nieuw = tabUitHash();
     if (nieuw !== tab) { tab = nieuw; teken(); }
   });
+  // Ook vanaf hier bezoeken afsluiten die over hun tijd zijn — dan hoeft haar
+  // telefoon er niet voor aan te staan.
+  sluitVergetenBezoeken(opslag);
   teken();
   laadBenodigdeFotos();
 
   setInterval(() => {
     if (document.visibilityState === 'visible' && !storendMoment()) {
+      sluitVergetenBezoeken(opslag);
       opslag.ververs().then(laadBenodigdeFotos).catch(() => {});
     }
   }, 120000);
@@ -852,10 +858,11 @@ function beschrijfBezoek(bezoek) {
   const start = new Date(bezoek.gestartOp);
   const klok = (d) => `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
   const wie = schoonmakerNaam(doc(), bezoek.schoonmakerId);
+  const duur = alsDuur(Math.round(bezoekMinuten(bezoek, new Date(), werktijden(doc()).stopNa)));
   const wanneer = bezoek.gestoptOp
-    ? `${langeDatum(start)} ${klok(start)} – ${klok(new Date(bezoek.gestoptOp))} `
-      + `(${alsDuur(Math.round((new Date(bezoek.gestoptOp) - start) / 60000))})`
-    : `${langeDatum(start)} vanaf ${klok(start)} — niet afgesloten`;
+    ? `${langeDatum(start)} ${klok(start)} – ${klok(new Date(bezoek.gestoptOp))} (${duur})`
+      + (bezoek.automatisch ? ' — vanzelf afgesloten' : '')
+    : `${langeDatum(start)} vanaf ${klok(start)} — nog bezig`;
   return wie ? `${wie} · ${wanneer}` : wanneer;
 }
 

@@ -164,9 +164,30 @@ tijdstempel, en kan ongedaan gemaakt worden.
 De gewerkte tijd komt terug in het beheer: als label bij de week, en in de
 historie per week met de exacte begin- en eindtijden.
 
-Vergeet ze op *klaar* te tikken, dan telt die keer niet mee — een bezoek dat op
-een eerdere dag begon en nooit is afgesloten levert geen fantasie-uren op. De app
-meldt het wel.
+#### Als er niet op *klaar* getikt wordt
+
+Dat gebeurt. Daarom bewaakt de app de tijd zelf:
+
+- **na 3 uur** verschijnt in het werkblok de vraag *"Je bent al 3 uur bezig. Ben
+  je klaar?"*, met daaronder de knop **Nog even door**;
+- daarna **elk uur opnieuw**, tot ze klaar is of doorgeeft dat ze doorgaat;
+- **na 5 uur** sluit de app het bezoek zelf af. In de historie staat er dan
+  "vanzelf afgesloten" bij, zodat een beheerder het verschil ziet.
+
+De eindtijd wordt niet op het moment van afsluiten geprikt maar berekend uit
+`gestartOp + 5 uur`. Elk toestel komt zo op dezelfde tijd uit, en tweemaal
+afsluiten verandert niets (de bewerking is idempotent). Het afkappen gebeurt ook
+in de weergave: een nog lopend bezoek van meer dan 5 uur telt nooit langer mee
+dan 5 uur, ook niet als het toestel offline stond.
+
+Belangrijk om te weten: **de herinnering komt alleen in de app**. Zonder server
+is er geen push-notificatie — staat de telefoon in haar zak met de app dicht,
+dan ziet ze de vraag pas als ze hem weer opent. Het automatisch afsluiten na 5
+uur gebeurt wél altijd, want dat wordt uit de starttijd afgeleid en niet uit een
+timer.
+
+De drie tijden staan als `herinnerNa`, `herinnerElke` en `stopNa` (in minuten)
+in `instellingen`; zonder waarde gelden 180, 60 en 300.
 
 ## Slecht netwerk
 
@@ -304,7 +325,8 @@ test voor.
 
 ## Bewust niet gebouwd
 
-Meerdere huishoudens, facturatie, notificaties, foto's als bewijs achteraf, en
+Meerdere huishoudens, facturatie, push-notificaties (daar is een server voor
+nodig; de herinnering na 3 uur is daarom in-app), foto's als bewijs achteraf, en
 het automatisch samenstellen van de weeklijst op basis van frequentie. De
 structuur staat het toe: `standaardFrequentie`, de historie per taak en de
 geregistreerde tijden liggen er al voor klaar.
