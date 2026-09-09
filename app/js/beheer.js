@@ -234,7 +234,7 @@ function tekenWeek() {
       ]),
       el('div', { class: 'knoppenrij' }, [
         el('button', { class: 'knop klein', tekst: '↺ Kopieer vorige week', onclick: () => kopieerVorigeWeek(sam) }),
-        el('button', { class: 'knop klein', tekst: '✓ Alles wekelijks aanzetten', onclick: () => zetWekelijks(sam, alle) }),
+        el('button', { class: 'knop klein', tekst: '✓ Alles wekelijks aanzetten', onclick: () => zetWekelijks(sam) }),
         el('button', { class: 'knop klein gevaar', tekst: 'Alles uit', onclick: () => zetSelectie(sam, []) }),
       ]),
     ]),
@@ -247,7 +247,7 @@ function tekenWeek() {
         el('h2', { tekst: groep.ruimteNaam }),
         el('span', { class: 'aantal', tekst: `${aantal}/${groep.taken.length}` }),
       ]),
-      el('ul', { class: 'taaklijst' }, groep.taken.map((taak) => tekenSamenstellerTaak(sam, alle, taak))),
+      el('ul', { class: 'taaklijst' }, groep.taken.map((taak) => tekenSamenstellerTaak(sam, taak))),
     );
   }
 
@@ -259,7 +259,7 @@ function tekenWeek() {
   }
 }
 
-function tekenSamenstellerTaak(sam, alle, taak) {
+function tekenSamenstellerTaak(sam, taak) {
   const laat = taak.wekenGeleden === null || taak.wekenGeleden >= 4;
   const fotoUrl = taak.fotoId ? fotos.url(taak.fotoId) : null;
 
@@ -273,7 +273,6 @@ function tekenSamenstellerTaak(sam, alle, taak) {
     taak.geschatteMinuten ? el('span', { class: 'label stil', tekst: `${taak.geschatteMinuten} min` }) : null,
   ]);
 
-  // Opruimtaken staan altijd op de lijst; die zijn niet aan of uit te zetten.
   const binnenkant = [
     el('span', { class: 'vink', 'aria-hidden': 'true' }, [vinkIcoon()]),
     el('span', { class: 'taak-midden' }, [
@@ -283,19 +282,19 @@ function tekenSamenstellerTaak(sam, alle, taak) {
   ];
 
   return el('li', {
-    class: `taak${taak.geselecteerd ? ' gekozen' : ''}${taak.vast ? ' vast' : ''}`,
+    class: `taak${taak.geselecteerd ? ' gekozen' : ''}`,
     dataset: { taak: taak.id },
   }, [
     el('div', { class: 'taak-hoofd' }, [
-      taak.vast
-        ? el('div', { class: 'taak-rij', stijl: { cursor: 'default' }, title: 'Opruimtaken staan altijd op de weeklijst' }, binnenkant)
-        : el('button', {
-          class: 'taak-rij', type: 'button', 'aria-pressed': taak.geselecteerd ? 'true' : 'false',
-          onclick: () => {
-            const ids = alle.filter((t) => (t.id === taak.id ? !t.geselecteerd : t.geselecteerd)).map((t) => t.id);
-            zetSelectie(sam, ids);
-          },
-        }, binnenkant),
+      el('button', {
+        class: 'taak-rij', type: 'button', 'aria-pressed': taak.geselecteerd ? 'true' : 'false',
+        onclick: () => {
+          const ids = verseStand(sam)
+            .filter((t) => (t.id === taak.id ? !t.geselecteerd : t.geselecteerd))
+            .map((t) => t.id);
+          zetSelectie(sam, ids);
+        },
+      }, binnenkant),
       fotoUrl ? el('button', {
         class: 'foto-knop', type: 'button', 'aria-label': `Foto bij ${taak.titel}`,
         onclick: () => toonFoto(fotoUrl, taak.titel),
@@ -304,14 +303,28 @@ function tekenSamenstellerTaak(sam, alle, taak) {
   ]);
 }
 
+/**
+ * De taken zoals ze er nú voor staan. Bewust niet de lijst uit het vorige
+ * tekenmoment: tussen twee tikken kan er al iets veranderd zijn, en dan zou de
+ * tweede tik de eerste ongedaan maken.
+ */
+function verseStand(sam) {
+  const nu = weekSamensteller(doc(), sam.week.jaar, sam.week.weeknummer);
+  return nu.groepen.flatMap((g) => g.taken);
+}
+
 function zetSelectie(sam, taakIds) {
+  // `bekend` legt vast waar hij uit kon kiezen. Zo weet de app later dat een
+  // weggelaten opruimtaak bewust weggelaten is, en een nieuwe nog niet bekeken.
+  const bekend = taakLijst(doc()).map((t) => t.id);
   opslag.doe(
-    { soort: 'week.taken', week: sam.week.sleutel, taakIds },
+    { soort: 'week.taken', week: sam.week.sleutel, taakIds, bekend },
     { vervangSleutel: `weektaken:${sam.week.sleutel}` },
   );
 }
 
-function zetWekelijks(sam, alle) {
+function zetWekelijks(sam) {
+  const alle = verseStand(sam);
   const ids = new Set(alle.filter((t) => t.geselecteerd).map((t) => t.id));
   for (const taak of alle) if (taak.type === 'wekelijks') ids.add(taak.id);
   zetSelectie(sam, [...ids]);

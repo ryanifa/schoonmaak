@@ -368,15 +368,32 @@ test('een opruimtaak staat op de weeklijst ook als de beheerder hem niet kiest',
   assert.ok(opruimen.every((r) => !r.afgevinkt && r.resultaat === null));
 });
 
-test('"alles uit" haalt de opruimtaken er niet af', () => {
+test('een opruimtaak die de beheerder wegklikt blijft weg', () => {
+  // De weeklijst uit het beheerscherm stuurt mee waar hij uit kon kiezen. Alles
+  // wat hij toen zag maar niet aanvinkte, laat hij bewust weg.
   let doc = maakVoorbeeldDocument();
-  doc = pasToe(doc, { soort: 'week.taken', week: W34, taakIds: [] });
-  assert.equal(weekOverzicht(doc, 2026, 34).regels.length, 5, 'alleen de opruimtaken blijven staan');
+  const alles = doc.taken.map((t) => t.id);
+  const [weg, ...rest] = altijdOpDeLijst(doc).map((t) => t.id);
+  doc = pasToe(doc, { soort: 'week.taken', week: W34, taakIds: rest, bekend: alles });
+
+  const regels = weekOverzicht(doc, 2026, 34).regels;
+  assert.equal(regels.length, 4, 'alleen de vier overgebleven opruimtaken');
+  assert.ok(!regels.some((r) => r.taakId === weg), 'de weggeklikte staat er niet meer');
+
+  // En opnieuw afspelen laat hem niet stiekem terugkomen.
+  const nogmaals = pasToe(doc, { soort: 'week.taken', week: W34, taakIds: rest, bekend: alles });
+  assert.equal(weekOverzicht(nogmaals, 2026, 34).regels.length, 4);
+});
+
+test('"alles uit" haalt echt alles van de lijst', () => {
+  let doc = maakVoorbeeldDocument();
+  doc = pasToe(doc, { soort: 'week.taken', week: W34, taakIds: [], bekend: doc.taken.map((t) => t.id) });
+  assert.equal(weekOverzicht(doc, 2026, 34).regels.length, 0);
 });
 
 test('een nieuwe opruimtaak verschijnt meteen in een al samengestelde week', () => {
   let doc = maakVoorbeeldDocument();
-  doc = pasToe(doc, { soort: 'week.taken', week: W34, taakIds: [] });
+  doc = pasToe(doc, { soort: 'week.taken', week: W34, taakIds: [], bekend: doc.taken.map((t) => t.id) });
   const voor = weekOverzicht(doc, 2026, 34).regels.length;
 
   doc = pasToe(doc, {

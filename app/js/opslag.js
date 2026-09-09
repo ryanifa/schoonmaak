@@ -218,14 +218,21 @@ export class Opslag extends EventTarget {
 
       this.serverDoc = nieuw;
       this.geladen = true;
-      // Alleen weghalen wat we echt verstuurd hebben; ondertussen kan er meer bij zijn gekomen.
-      this.wachtrij = this.wachtrij.slice(teVersturen.length);
+      // Precies die bewerkingen weghalen die we verstuurd hebben, en niet de
+      // eerste zoveel: tijdens het versturen kan `doe` een wachtende bewerking
+      // vervángen door een nieuwere (zelfde vervangSleutel). Die nieuwere staat
+      // dan op dezelfde plek in de rij maar is een ánder object, en moet blijven
+      // staan. Op aantal afsnijden gooide hem weg — een klik die verdween.
+      const verstuurd = new Set(teVersturen);
+      this.wachtrij = this.wachtrij.filter((b) => !verstuurd.has(b));
       this.pogingen = 0;
       this.laatsteFout = null;
       this.bewaarWachtrij();
       this.bewaarMomentopname();
       this.meld('opgeslagen');
       this.meld('verandering');
+      // Er kan tijdens het versturen iets bijgekomen zijn. Meteen achteraan.
+      if (this.wachtrij.length) this.plan(200);
     } catch (fout) {
       this.laatsteFout = fout;
       if (fout.tijdelijk) {

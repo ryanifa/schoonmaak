@@ -119,11 +119,17 @@ Naast ruimte heeft elke taak een **type**, en dat bepaalt het gedrag:
 |---|---|
 | `wekelijks` | Staat standaard aan als je een week samenstelt |
 | `periodiek` | Zet je zelf aan als hij aan de beurt is; je ziet erbij hoelang geleden het is gedaan |
-| `indien_nodig` | Staat **altijd** op haar lijst — ook als je hem niet aanvinkt, en ook "alles uit" haalt hem er niet af |
+| `indien_nodig` | Staat **standaard** op haar lijst, ook zonder dat je hem aanvinkt — maar je kunt hem wel uitzetten |
 
 `indien_nodig` is voor opruimtaken. Normaal ruimt de bewoner zelf op, maar dat
 lukt niet altijd, en in een rommelige kamer valt niet schoon te maken. Zij moet
 dat dus zelf kunnen oppakken zonder te overleggen.
+
+Ze staan er daarom vanzelf bij zolang je een week niet hebt samengesteld. Zodra
+je de weeklijst aanraakt, telt jouw lijst: een opruimtaak die je wegklikt blijft
+weg, ook bij haar. De app onthoudt per week welke taken je toen voor je had, dus
+een opruimtaak die je later aanmaakt komt er alsnog vanzelf bij — die had je nog
+niet beoordeeld.
 
 Daarom heeft zo'n taak twee knoppen in plaats van een vinkje: **Was al in orde**
 en **Heb ik gedaan**. Allebei gelden als afgerond, maar het verschil blijft
@@ -220,6 +226,12 @@ Elke bewerking geeft bij herhaling hetzelfde resultaat, dus opnieuw afspelen is
 altijd veilig. Zo overleeft een afvinkje op de telefoon een notitie die op
 hetzelfde moment op de laptop wordt getypt — daar is een test voor.
 
+Snel achter elkaar tikken mag ook. Bewerkingen die elkaar overschrijven (de
+weeklijst samenstellen, een notitie typen) dragen een vervangsleutel: een nieuwe
+neemt de plek van de wachtende in, zodat vijf tikken één schrijfactie worden. Wat
+er tijdens het schrijven bij komt, blijft in de rij staan en gaat meteen daarna
+mee — ook daar is een test voor.
+
 De gegevens staan in drie losse bestanden (bibliotheek, weken, berichten), zodat
 een wijziging alleen het bestand raakt waar hij bij hoort.
 
@@ -309,8 +321,8 @@ npm run dev     # bekijk de app lokaal op http://localhost:4321
 De tests draaien ook bij elke push; publiceren gebeurt alleen als ze slagen.
 
 Wat ze afdekken: ISO-weeklogica inclusief jaren met 53 weken; alle bewerkingen op
-het datamodel, inclusief starten, klaar melden en de opruimtaken (die er altijd
-bij staan, ook na "alles uit"); dat elke laminaatvloer de waarschuwing tegen nat
+het datamodel, inclusief starten, klaar melden en de opruimtaken (die er vanzelf
+bij staan tot je ze wegklikt); dat elke laminaatvloer de waarschuwing tegen nat
 dweilen draagt; en het synchroniseren tegen een
 **nagebouwde Gist-API** (`test/nep-gist.js`) — gelijktijdig werken op telefoon en
 laptop, een wachtrij die een herstart overleeft, offline openen, een verkeerde

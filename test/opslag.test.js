@@ -404,3 +404,30 @@ test('historie wissen komt ook in de Gist terecht', async () => {
   assert.deepEqual(doc.weken, {});
   assert.ok(doc.taken.length >= 25, 'de bibliotheek staat er nog');
 });
+
+test('een tik tijdens het versturen gaat niet verloren', async () => {
+  // Zij vinkt twee taken aan vlak na elkaar. De eerste is al onderweg naar de
+  // Gist als de tweede binnenkomt; die vervangt de wachtende bewerking. Dat
+  // vervangende item mag na afloop niet met de verstuurde rij mee weggegooid
+  // worden — anders verdwijnt de tweede tik zonder melding.
+  const opslag = nieuweOpslag();
+  await opslag.begin();
+  const sleutel = weekSleutel(2026, 37);
+  const [a, b] = opslag.document().taken.map((t) => t.id);
+
+  opslag.doe({ soort: 'week.taken', week: sleutel, taakIds: [a] }, { vervangSleutel: 'weektaken' });
+  const onderweg = opslag.verstuur({ handmatig: true });
+
+  github.vertraging = 20;
+  opslag.doe({ soort: 'week.taken', week: sleutel, taakIds: [a, b] }, { vervangSleutel: 'weektaken' });
+  await onderweg;
+  assert.deepEqual(Object.keys(opslag.document().weken[sleutel].taken), [a, b], 'meteen zichtbaar');
+
+  await opslag.verstuur({ handmatig: true });
+  github.vertraging = 0;
+
+  const verse = nieuweOpslag();
+  const opnieuw = await verse.begin();
+  assert.deepEqual(Object.keys(opnieuw.weken[sleutel].taken), [a, b], 'ook echt weggeschreven');
+  assert.equal(opslag.wachtrij.length, 0);
+});
