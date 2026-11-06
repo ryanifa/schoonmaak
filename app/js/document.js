@@ -200,7 +200,15 @@ export function pasToe(doc, bewerking) {
       if (!bestaand) break;
       d.weken[bewerking.week] = {
         ...week,
-        taken: { ...week.taken, [bewerking.taakId]: { ...bestaand, opmerking: bewerking.opmerking } },
+        taken: {
+          ...week.taken,
+          [bewerking.taakId]: {
+            ...bestaand,
+            opmerking: bewerking.opmerking,
+            // Nodig om de opmerking in het gesprek op zijn plek te zetten.
+            opmerkingOp: bewerking.opmerking ? (bewerking.tijd || bestaand.opmerkingOp || null) : null,
+          },
+        },
       };
       break;
     }
@@ -689,6 +697,7 @@ export function alleOpmerkingen(doc, limiet = 100) {
         startdatum: week.startdatum,
         afgevinkt: !!stand.afgevinkt,
         opmerking: stand.opmerking,
+        opmerkingOp: stand.opmerkingOp || null,
       });
     }
   }
@@ -727,6 +736,43 @@ export function historieOmvang(doc) {
     aantalBezoeken: bezoeken.length,
     aantalBerichten: (doc.berichten || []).length,
   };
+}
+
+/**
+ * Alles wat er over en weer gezegd is, als één gesprek: de berichten van beide
+ * kanten plus haar opmerkingen bij taken. Oudste eerst, zodat het nieuwste
+ * onderaan staat — zoals in elk gesprek.
+ *
+ * Een opmerking van vóór deze versie heeft geen tijdstip; die hangen we aan de
+ * startdatum van de week, dan staat hij in elk geval op de goede plek in de tijd.
+ */
+export function gesprek(doc, limiet = 200) {
+  const regels = (doc.berichten || []).map((b) => ({
+    soort: 'bericht',
+    id: b.id,
+    afzender: b.afzender,
+    tekst: b.tekst,
+    op: b.aangemaaktOp,
+    gelezen: !!b.gelezen,
+    week: b.week || null,
+  }));
+
+  for (const o of alleOpmerkingen(doc, 500)) {
+    regels.push({
+      soort: 'opmerking',
+      id: `${o.jaar}-${o.weeknummer}-${o.taakId}`,
+      afzender: 'schoonmaakster',
+      tekst: o.opmerking,
+      op: o.opmerkingOp || `${o.startdatum}T12:00:00.000Z`,
+      taakTitel: o.titel,
+      ruimteNaam: o.ruimteNaam,
+      week: weekSleutel(o.jaar, o.weeknummer),
+    });
+  }
+
+  return regels
+    .sort((a, b) => String(a.op).localeCompare(String(b.op)))
+    .slice(-limiet);
 }
 
 export function aantalOngelezen(doc, voorRol) {

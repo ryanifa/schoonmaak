@@ -111,6 +111,26 @@ laatst gedaan is**, snelknoppen (kopieer vorige week, alles wekelijks, alles uit
 en een notitieveld. Historie per week en per taak, plus alle opmerkingen en
 berichten met een ongelezen-markering.
 
+### Berichten
+
+Eén gesprek tussen jou en haar. Een bericht hangt intern aan een week — dat is
+handig in jouw historie — maar dat bepaalt niet wat zij te zien krijgt: achter de
+knop **💬 Berichten** staat alles wat er ooit over en weer gezegd is, oudste
+boven, nieuwste onderaan.
+
+Haar **opmerkingen bij taken** staan er vanzelf tussen, met de taak erbij ("bij
+Badkamer — Douche schoonmaken"). Zo staat alles wat er gezegd is op één plek, in
+de volgorde waarin het gezegd is, en hoeft zij zich niet af te vragen of ze iets
+als bericht of als opmerking had achtergelaten.
+
+Schrijf jij iets, dan staat er een rood telletje op haar knop tot ze het opent —
+net zoals jij dat op het tabblad Berichten hebt. Dat telt alleen wat van de
+ander komt.
+
+> Opmerkingen hadden geen tijdstip; dat is er nu bij gekomen (`opmerkingOp`).
+> Een opmerking van vóór deze versie valt terug op de startdatum van zijn week,
+> zodat hij in elk geval op de goede plek in de tijd staat.
+
 ### Drie soorten taken
 
 Naast ruimte heeft elke taak een **type**, en dat bepaalt het gedrag:
@@ -351,7 +371,7 @@ op een ander apparaat bij is gekomen.
 ## Testen
 
 ```bash
-npm test           # 104 tests, puur Node
+npm test           # 109 tests, puur Node
 npm run dev        # bekijk de app lokaal op http://localhost:4321
 npm run browsertest   # in een echte browser; vereist de dev-server hierboven
 ```
@@ -364,7 +384,8 @@ niets naar GitHub.
 Wat ze afdekken: ISO-weeklogica inclusief jaren met 53 weken; alle bewerkingen op
 het datamodel, inclusief starten, klaar melden en de opruimtaken (die er vanzelf
 bij staan tot je ze wegklikt); de tijdbegroting en het alarm, met een verzetbare
-klok; dat elke laminaatvloer de waarschuwing tegen nat dweilen draagt; en het
+klok; het gesprek met berichten en opmerkingen door elkaar op volgorde van de
+tijd; dat elke laminaatvloer de waarschuwing tegen nat dweilen draagt; en het
 synchroniseren tegen een
 **nagebouwde Gist-API** (`test/nep-gist.js`) — gelijktijdig werken op telefoon en
 laptop, een wachtrij die een herstart overleeft, offline openen, een verkeerde

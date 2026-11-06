@@ -10,7 +10,7 @@ import { meld } from './melding.js';
 import {
   weekOverzicht, weekSleutel, nieuwId, lopendBezoek, gewerkteMinuten, alsDuur,
   automatischGestopteBezoeken, herinneringNummer, werktijden, watStaatNogOpen,
-  schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam,
+  schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam, gesprek, aantalOngelezen,
 } from './document.js';
 import { sluitVergetenBezoeken, alGezien, onthoudGezien } from './werktijd.js';
 import { toonTestbalkIndienNodig } from './testbanner.js';
@@ -134,6 +134,7 @@ function tekenNu() {
 
   tekenKlaarMelding(voortgang);
   tekenBerichten();
+  tekenBerichtKnop();
 }
 
 /* --------------------------------------------------------- starten en klaar */
@@ -536,11 +537,27 @@ function tekenBerichten() {
   if (!overzicht.berichten.length) return;
   doel.append(el('div', { class: 'kaart' }, [
     el('div', { class: 'kaart-kop' }, [el('h2', { tekst: 'Berichten deze week' })]),
-    el('div', { class: 'kaart-binnen' }, overzicht.berichten.map((b) => el('div', { stijl: { marginBottom: '12px' } }, [
-      el('div', { class: 'klein stil', tekst: `${b.afzender === 'beheerder' ? 'Van thuis' : 'Van jou'} — ${tijdstempel(b.aangemaaktOp)}` }),
-      el('div', { tekst: b.tekst, stijl: { whiteSpace: 'pre-wrap' } }),
-    ]))),
+    el('div', { class: 'kaart-binnen' }, [
+      // Oudste eerst, net als in het hele gesprek: twee volgordes op één scherm
+      // leest verwarrend.
+      ...[...overzicht.berichten].reverse().map((b) => el('div', { stijl: { marginBottom: '12px' } }, [
+        el('div', { class: 'klein stil', tekst: `${b.afzender === 'beheerder' ? 'Van thuis' : 'Van jou'} — ${tijdstempel(b.aangemaaktOp)}` }),
+        el('div', { tekst: b.tekst, stijl: { whiteSpace: 'pre-wrap' } }),
+      ])),
+      el('button', { class: 'knop klein stil', type: 'button', tekst: 'Alles teruglezen', onclick: toonGesprek }),
+    ]),
   ]));
+}
+
+/** De knop onderaan, met het aantal berichten van thuis dat ze nog niet las. */
+function tekenBerichtKnop() {
+  const knop = $('#bericht-knop');
+  const nieuw = aantalOngelezen(opslag.document(), 'schoonmaakster');
+  // voegToe en niet append: append(null) zet het woord "null" in de knop.
+  voegToe(leeg(knop),
+    el('span', { tekst: '💬 Berichten' }),
+    nieuw ? el('span', { class: 'teller', tekst: String(nieuw) }) : null);
+  knop.classList.toggle('primair', nieuw > 0);
 }
 
 /* ------------------------------------------------------------------- acties */
@@ -580,6 +597,7 @@ function opmerkingBewerken(taak) {
             week: huidigeWeekSleutel(),
             taakId: taak.taakId,
             opmerking: invoer.value.trim(),
+            tijd: new Date().toISOString(),
           }, { vervangSleutel: `opmerking:${taak.taakId}` });
           modaal.sluit();
         },
@@ -589,16 +607,30 @@ function opmerkingBewerken(taak) {
   setTimeout(() => invoer.focus(), 80);
 }
 
-function berichtAchterlaten() {
+/**
+ * Alles wat er over en weer gezegd is, als één gesprek. Een bericht hangt
+ * intern aan een week — handig in het beheer — maar "de stofzuiger is stuk"
+ * loopt door, dus hier bepaalt die week niet wat ze te zien krijgt.
+ */
+function toonGesprek() {
+  const regels = gesprek(opslag.document());
+  const lijst = el('div', { class: 'gesprek' }, regels.length
+    ? regels.map(tekenGesprekregel)
+    : [el('p', { class: 'stil klein', tekst: 'Nog niets gezegd. Schrijf hieronder het eerste bericht.' })]);
+
   const invoer = el('textarea', {
     placeholder: 'Bijvoorbeeld: de stofzuiger is stuk, of de allesreiniger is bijna op.', maxlength: '2000',
   });
+
   const modaal = toonModaal({
-    titel: 'Bericht achterlaten',
-    ondertitel: 'Voor algemene dingen die niet bij één taak horen.',
-    inhoud: [invoer],
+    titel: 'Berichten',
+    inhoud: [
+      lijst,
+      el('p', { class: 'hulp', tekst: 'Voor dingen die niet bij één taak horen. Opmerkingen bij een taak staan er vanzelf tussen.' }),
+      invoer,
+    ],
     knoppen: [
-      { tekst: 'Annuleren', bij: () => modaal.sluit() },
+      { tekst: 'Sluiten', bij: () => modaal.sluit() },
       {
         tekst: 'Versturen', primair: true,
         bij: () => {
@@ -621,8 +653,29 @@ function berichtAchterlaten() {
       },
     ],
   });
-  setTimeout(() => invoer.focus(), 80);
+
+  // Wat van thuis komt heeft ze nu gezien; het telletje mag weg.
+  if (aantalOngelezen(opslag.document(), 'schoonmaakster')) {
+    opslag.doe({ soort: 'berichten.allesGelezen', afzender: 'beheerder' });
+  }
+  // Het nieuwste staat onderaan, dus daar begint ze.
+  requestAnimationFrame(() => { lijst.scrollTop = lijst.scrollHeight; });
 }
 
-$('#bericht-knop').addEventListener('click', berichtAchterlaten);
+function tekenGesprekregel(regel) {
+  const vanThuis = regel.afzender === 'beheerder';
+  const wie = vanThuis ? 'Van thuis' : 'Van jou';
+  return el('div', { class: `bericht ${vanThuis ? 'van-thuis' : 'van-jou'}` }, [
+    el('div', { class: 'klein stil', tekst: `${wie} — ${tijdstempel(regel.op)}` }),
+    regel.soort === 'opmerking'
+      ? el('div', {
+        class: 'klein bij-taak',
+        tekst: `bij ${[regel.ruimteNaam, regel.taakTitel].filter(Boolean).join(' — ')}`,
+      })
+      : null,
+    el('div', { class: 'bericht-tekst', tekst: regel.tekst }),
+  ]);
+}
+
+$('#bericht-knop').addEventListener('click', toonGesprek);
 begin();

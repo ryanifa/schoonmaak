@@ -6,7 +6,7 @@ import {
   ruimteLijst, taakLijst, laatstGedaan, haalWeek,
   lopendBezoek, gewerkteMinuten, alsDuur, bezoekMinuten,
   autoStopBewerkingen, herinneringNummer, automatischGestopteBezoeken, werktijden, WERKTIJD,
-  altijdOpDeLijst, resultaatTelling, TAAKTYPES, tijdBegroting, watStaatNogOpen,
+  altijdOpDeLijst, resultaatTelling, TAAKTYPES, tijdBegroting, watStaatNogOpen, gesprek,
   schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam, historieOmvang,
 } from '../app/js/document.js';
 import { maakVoorbeeldDocument } from '../app/js/seed.js';
@@ -850,4 +850,83 @@ test('de historie toont naast de gewerkte ook de geplande tijd', () => {
 
   const w = historie(doc).find((x) => x.weeknummer === 34);
   assert.equal(w.geplandeMinuten, minuten);
+});
+
+/* ------------------------------------------------------------ het gesprek -- */
+
+test('het gesprek zet berichten en opmerkingen op volgorde van de tijd', () => {
+  let doc = maakVoorbeeldDocument();
+  const taak = doc.taken.find((t) => t.type === 'wekelijks');
+  doc = pasToe(doc, { soort: 'week.taken', week: W34, taakIds: [taak.id], bekend: doc.taken.map((t) => t.id) });
+
+  doc = pasToe(doc, {
+    soort: 'bericht.maak',
+    bericht: { id: 'b1', week: W34, afzender: 'beheerder', tekst: 'Tot dinsdag', aangemaaktOp: '2026-08-17T09:00:00.000Z', gelezen: false },
+  });
+  doc = pasToe(doc, {
+    soort: 'weektaak.opmerking', week: W34, taakId: taak.id,
+    opmerking: 'De kraan lekt', tijd: '2026-08-18T10:00:00.000Z',
+  });
+  doc = pasToe(doc, {
+    soort: 'bericht.maak',
+    bericht: { id: 'b2', week: W34, afzender: 'schoonmaakster', tekst: 'Zeep is op', aangemaaktOp: '2026-08-19T11:00:00.000Z', gelezen: false },
+  });
+
+  const regels = gesprek(doc);
+  assert.deepEqual(regels.map((r) => r.tekst), ['Tot dinsdag', 'De kraan lekt', 'Zeep is op'], 'oudste eerst');
+  assert.deepEqual(regels.map((r) => r.afzender), ['beheerder', 'schoonmaakster', 'schoonmaakster']);
+  assert.equal(regels[1].soort, 'opmerking');
+  assert.equal(regels[1].taakTitel, taak.titel);
+});
+
+test('het gesprek houdt berichten van alle weken vast', () => {
+  let doc = maakVoorbeeldDocument();
+  for (const [i, week] of [W33, W34].entries()) {
+    doc = pasToe(doc, {
+      soort: 'bericht.maak',
+      bericht: { id: `b${i}`, week, afzender: 'beheerder', tekst: `week ${i}`, aangemaaktOp: `2026-08-1${i}T09:00:00.000Z`, gelezen: false },
+    });
+  }
+  assert.equal(gesprek(doc).length, 2, 'niet alleen de huidige week');
+});
+
+test('een opmerking zonder tijdstip valt terug op de week', () => {
+  // Opmerkingen van vóór deze versie hebben geen tijdstip; die horen toch op
+  // de juiste plek in de tijd te staan en niet bovenaan of onderaan te plakken.
+  let doc = maakVoorbeeldDocument();
+  const taak = doc.taken.find((t) => t.type === 'wekelijks');
+  doc = pasToe(doc, { soort: 'week.taken', week: W33, taakIds: [taak.id], bekend: doc.taken.map((t) => t.id) });
+  doc = pasToe(doc, { soort: 'weektaak.opmerking', week: W33, taakId: taak.id, opmerking: 'oud' });
+
+  const [regel] = gesprek(doc);
+  assert.ok(regel.op.startsWith(doc.weken[W33].startdatum), regel.op);
+});
+
+test('een opmerking wissen haalt hem uit het gesprek', () => {
+  let doc = maakVoorbeeldDocument();
+  const taak = doc.taken.find((t) => t.type === 'wekelijks');
+  doc = pasToe(doc, { soort: 'week.taken', week: W34, taakIds: [taak.id], bekend: doc.taken.map((t) => t.id) });
+  doc = pasToe(doc, { soort: 'weektaak.opmerking', week: W34, taakId: taak.id, opmerking: 'iets', tijd: 't1' });
+  assert.equal(gesprek(doc).length, 1);
+
+  doc = pasToe(doc, { soort: 'weektaak.opmerking', week: W34, taakId: taak.id, opmerking: '', tijd: 't2' });
+  assert.equal(gesprek(doc).length, 0);
+  assert.equal(doc.weken[W34].taken[taak.id].opmerkingOp, null, 'en het tijdstip gaat mee weg');
+});
+
+test('zij heeft een telletje voor wat van thuis komt', () => {
+  let doc = maakVoorbeeldDocument();
+  doc = pasToe(doc, {
+    soort: 'bericht.maak',
+    bericht: { id: 'b1', week: W34, afzender: 'beheerder', tekst: 'hoi', aangemaaktOp: 't', gelezen: false },
+  });
+  doc = pasToe(doc, {
+    soort: 'bericht.maak',
+    bericht: { id: 'b2', week: W34, afzender: 'schoonmaakster', tekst: 'eigen bericht', aangemaaktOp: 't', gelezen: false },
+  });
+  assert.equal(aantalOngelezen(doc, 'schoonmaakster'), 1, 'haar eigen bericht telt niet mee');
+
+  doc = pasToe(doc, { soort: 'berichten.allesGelezen', afzender: 'beheerder' });
+  assert.equal(aantalOngelezen(doc, 'schoonmaakster'), 0);
+  assert.equal(aantalOngelezen(doc, 'beheerder'), 1, 'en die van haar staat nog open bij jou');
 });
