@@ -22,6 +22,16 @@ export function maakTestDocument() {
     { soort: 'schoonmaker.maak', id: 'sm-fatima', naam: 'Fatima' },
   ];
 
+  // Een paar taken staan in de testmodus op "mag blijven liggen", anders valt
+  // er aan die kant van de app niets te zien. In een echt huis kiest de
+  // beheerder dat zelf; hier is het puur om het gedrag te tonen.
+  for (const titel of [
+    'Planten water geven', 'Plant water geven', 'Keukentje schoonmaken',
+  ]) {
+    const taak = doc.taken.find((t) => t.titel === titel);
+    if (taak) bewerkingen.push({ soort: 'taak.bewerk', id: taak.id, velden: { magWachten: true } });
+  }
+
   const wekelijks = doc.taken.filter((t) => t.type === 'wekelijks').map((t) => t.id);
   const periodiek = doc.taken.filter((t) => t.type === 'periodiek').map((t) => t.id);
   const opruimen = doc.taken.filter((t) => t.type === 'indien_nodig').map((t) => t.id);

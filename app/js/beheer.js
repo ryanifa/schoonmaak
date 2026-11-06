@@ -164,7 +164,6 @@ function tekenWeek() {
   const sam = weekSamensteller(doc(), week.jaar, week.weeknummer);
   const alle = sam.groepen.flatMap((g) => g.taken);
   const gekozen = alle.filter((t) => t.geselecteerd);
-  const minuten = gekozen.reduce((som, t) => som + (t.geschatteMinuten || 0), 0);
   const nu = sam.navigatie.huidige;
   const isHuidige = sam.week.jaar === nu.jaar && sam.week.weeknummer === nu.weeknummer;
   const doel = leeg(scherm());
@@ -223,7 +222,6 @@ function tekenWeek() {
     el('div', { class: 'kaart-binnen' }, [
       el('div', { class: 'rij', stijl: { flexWrap: 'wrap', gap: '8px', marginBottom: '12px' } }, [
         el('span', { class: 'label accent', tekst: `${meervoud(gekozen.length, 'taak', 'taken')} gepland` }),
-        minuten ? el('span', { class: 'label', tekst: `± ${Math.round(minuten / 5) * 5} minuten` }) : null,
         bezig
           ? el('span', {
             class: 'label waarschuwing',
@@ -232,6 +230,7 @@ function tekenWeek() {
           : gewerkt ? el('span', { class: 'label', tekst: `gewerkt: ${alsDuur(gewerkt)}` }) : null,
         el('span', { class: 'label stil', tekst: `${alle.length} taken in de bibliotheek` }),
       ]),
+      tekenBegroting(sam.begroting),
       el('div', { class: 'knoppenrij' }, [
         el('button', { class: 'knop klein', tekst: '↺ Kopieer vorige week', onclick: () => kopieerVorigeWeek(sam) }),
         el('button', { class: 'knop klein', tekst: '✓ Alles wekelijks aanzetten', onclick: () => zetWekelijks(sam) }),
@@ -241,11 +240,15 @@ function tekenWeek() {
   ]));
 
   for (const groep of sam.groepen) {
-    const aantal = groep.taken.filter((t) => t.geselecteerd).length;
+    const gekozenHier = groep.taken.filter((t) => t.geselecteerd);
+    const minutenHier = gekozenHier.reduce((som, t) => som + (t.geschatteMinuten || 0), 0);
     doel.append(
       el('div', { class: 'ruimte-kop' }, [
         el('h2', { tekst: groep.ruimteNaam }),
-        el('span', { class: 'aantal', tekst: `${aantal}/${groep.taken.length}` }),
+        el('span', {
+          class: 'aantal',
+          tekst: `${gekozenHier.length}/${groep.taken.length}${minutenHier ? ` · ${alsDuur(minutenHier)}` : ''}`,
+        }),
       ]),
       el('ul', { class: 'taaklijst' }, groep.taken.map((taak) => tekenSamenstellerTaak(sam, taak))),
     );
@@ -257,6 +260,46 @@ function tekenWeek() {
       el('button', { class: 'knop primair', tekst: 'Naar de takenbibliotheek', onclick: () => kiesTab('bibliotheek') }),
     ]));
   }
+}
+
+/**
+ * De tijdbalk: wat je deze week hebt ingepland, afgezet tegen de beoogde
+ * werktijd. Bedoeld om tijdens het aanvinken te zien dat het niet meer past —
+ * niet om achteraf op de urenstaat te ontdekken dat het te veel was.
+ */
+function tekenBegroting(b) {
+  const schaal = Math.max(b.budget, b.totaalMinuten, 1);
+  const deel = (minuten) => `${(minuten / schaal) * 100}%`;
+  const teVeel = b.over > 0;
+
+  const uitleg = [
+    `${alsDuur(b.moetMinuten)} moet deze week af`,
+    b.wachtMinuten ? `${alsDuur(b.wachtMinuten)} mag blijven liggen` : null,
+  ].filter(Boolean).join(' · ');
+
+  return el('div', { class: `begroting${teVeel ? ' te-veel' : ''}` }, [
+    el('div', { class: 'begroting-kop' }, [
+      el('span', { tekst: 'Geplande tijd' }),
+      el('strong', { tekst: `${alsDuur(b.totaalMinuten)} van ${alsDuur(b.budget)}` }),
+    ]),
+    el('div', { class: 'balk', title: uitleg }, [
+      el('span', { class: 'balk-moet', stijl: { width: deel(b.moetMinuten) } }),
+      el('span', { class: 'balk-wacht', stijl: { width: deel(b.wachtMinuten) } }),
+      // Het streepje staat op de beoogde werktijd, zodat je ziet waar het over gaat.
+      b.totaalMinuten > b.budget
+        ? el('span', { class: 'balk-grens', stijl: { left: deel(b.budget) } })
+        : null,
+    ]),
+    el('div', { class: 'klein stil', tekst: uitleg }),
+    teVeel
+      ? el('div', {
+        class: 'klein',
+        tekst: b.moetOver > 0
+          ? `${alsDuur(b.over)} te veel — ook zonder wat mag blijven liggen is het ${alsDuur(b.moetOver)} te veel.`
+          : `${alsDuur(b.over)} te veel, maar dat zit helemaal in wat mag blijven liggen.`,
+      })
+      : null,
+  ]);
 }
 
 function tekenSamenstellerTaak(sam, taak) {
@@ -271,6 +314,7 @@ function tekenSamenstellerTaak(sam, taak) {
     el('span', { class: 'label stil', tekst: TAAKTYPE_LABEL[taak.type] }),
     taak.type === 'periodiek' ? el('span', { class: 'label stil', tekst: taak.standaardFrequentie }) : null,
     taak.geschatteMinuten ? el('span', { class: 'label stil', tekst: `${taak.geschatteMinuten} min` }) : null,
+    taak.magWachten ? el('span', { class: 'label wacht', tekst: 'mag blijven liggen' }) : null,
   ]);
 
   const binnenkant = [
@@ -351,6 +395,7 @@ function tekenBibliotheek() {
         el('button', { class: 'knop primair', tekst: '+ Nieuwe taak', onclick: () => bewerkTaak(null) }),
         el('button', { class: 'knop', tekst: '⌂ Ruimtes', onclick: beheerRuimtes }),
         el('button', { class: 'knop', tekst: '👤 Schoonmaaksters', onclick: beheerSchoonmakers }),
+        el('button', { class: 'knop', tekst: '⏱ Werktijd', onclick: beheerWerktijd }),
         el('button', {
           class: 'knop stil klein',
           tekst: toonGearchiveerd ? 'Verberg gearchiveerd' : 'Toon gearchiveerd',
@@ -392,6 +437,7 @@ function tekenBibliotheekTaak(taak, lijst, index) {
             el('span', { class: 'label', tekst: TAAKTYPE_LABEL[taak.type] }),
             taak.type === 'periodiek' ? el('span', { class: 'label stil', tekst: taak.standaardFrequentie }) : null,
             taak.geschatteMinuten ? el('span', { class: 'label stil', tekst: `${taak.geschatteMinuten} min` }) : null,
+            taak.magWachten ? el('span', { class: 'label wacht', tekst: 'mag blijven liggen' }) : null,
             !taak.actief ? el('span', { class: 'label waarschuwing', tekst: 'gearchiveerd' }) : null,
             !taak.fotoId ? el('span', { class: 'label stil', tekst: 'geen foto' }) : null,
           ]),
@@ -469,6 +515,9 @@ function bewerkTaak(taak) {
   const minutenVeld = el('input', { type: 'number', min: '0', max: '480', step: '5', placeholder: 'bijv. 10' });
   minutenVeld.value = taak?.geschatteMinuten ?? '';
 
+  const wachtVeld = el('input', { type: 'checkbox' });
+  wachtVeld.checked = !!taak?.magWachten;
+
   const fotoVak = el('div');
   const bestandVeld = el('input', {
     type: 'file', accept: 'image/*', stijl: { display: 'none' },
@@ -527,6 +576,16 @@ function bewerkTaak(taak) {
         frequentieVak,
         el('label', { class: 'veld' }, [el('span', { tekst: 'Geschatte minuten' }), minutenVeld]),
       ]),
+      el('label', { class: 'aanvink' }, [
+        wachtVeld,
+        el('span', {}, [
+          el('span', { tekst: 'Mag blijven liggen' }),
+          el('span', {
+            class: 'klein stil',
+            tekst: 'Zij ziet dit op haar lijst staan, en bij het alarm na de beoogde werktijd is dit het eerste dat ze mag overslaan.',
+          }),
+        ]),
+      ]),
       el('label', { class: 'veld' }, [el('span', { tekst: 'Voorbeeldfoto' }), fotoVak]),
       bestandVeld,
       !nieuw ? el('div', { class: 'knoppenrij', stijl: { marginTop: '4px' } }, [
@@ -557,6 +616,7 @@ function bewerkTaak(taak) {
             type: typeVeld.value,
             standaardFrequentie: typeVeld.value === 'periodiek' ? frequentieVeld.value : 'wekelijks',
             geschatteMinuten: minutenVeld.value === '' ? null : Number(minutenVeld.value),
+            magWachten: wachtVeld.checked,
             fotoId,
           };
           if (nieuw) opslag.doe({ soort: 'taak.maak', taak: { id: nieuwId('t'), ...velden } });
@@ -567,6 +627,64 @@ function bewerkTaak(taak) {
     ],
   });
   setTimeout(() => titelVeld.focus(), 80);
+}
+
+/**
+ * De beoogde werktijd. Eén getal dat twee dingen doet: de weeklijst wordt
+ * eraan afgemeten, en bij haar gaat op dat moment het alarm af.
+ */
+function beheerWerktijd() {
+  const t = werktijden(doc());
+  const veld = (waarde, max) => {
+    const invoer = el('input', { type: 'number', min: '15', max: String(max), step: '15' });
+    invoer.value = String(waarde);
+    return invoer;
+  };
+  const budgetVeld = veld(t.herinnerNa, 480);
+  const elkeVeld = veld(t.herinnerElke, 240);
+  const stopVeld = veld(t.stopNa, 600);
+
+  const modaal = toonModaal({
+    titel: 'Werktijd',
+    inhoud: [
+      el('label', { class: 'veld' }, [
+        el('span', { tekst: 'Beoogde werktijd per keer (minuten)' }), budgetVeld,
+        el('span', { class: 'klein stil', tekst: 'De weeklijst wordt hieraan afgemeten, en op dit moment gaat bij haar het alarm af.' }),
+      ]),
+      el('label', { class: 'veld' }, [
+        el('span', { tekst: 'Daarna herhalen om de (minuten)' }), elkeVeld,
+      ]),
+      el('label', { class: 'veld' }, [
+        el('span', { tekst: 'Vanzelf afsluiten na (minuten)' }), stopVeld,
+        el('span', { class: 'klein stil', tekst: 'Een beurt die niet op "klaar" is gezet, telt nooit langer mee dan dit.' }),
+      ]),
+      el('p', { class: 'hulp', tekst: 'Het alarm is alleen te zien zolang de app openstaat. Het vanzelf afsluiten gebeurt altijd: dat wordt uit de starttijd berekend.' }),
+    ],
+    knoppen: [
+      { tekst: 'Annuleren', bij: () => modaal.sluit() },
+      {
+        tekst: 'Opslaan', primair: true,
+        bij: () => {
+          const budget = Number(budgetVeld.value);
+          const stop = Number(stopVeld.value);
+          if (!(budget > 0) || !(Number(elkeVeld.value) > 0) || !(stop > 0)) {
+            return meld('Vul overal een aantal minuten in.', 'fout', { duur: 3000 });
+          }
+          if (stop < budget) {
+            stopVeld.focus();
+            return meld('Vanzelf afsluiten kan niet eerder dan het alarm.', 'fout', { duur: 4000 });
+          }
+          for (const [sleutel, waarde] of [
+            ['herinnerNa', budget], ['herinnerElke', Number(elkeVeld.value)], ['stopNa', stop],
+          ]) {
+            opslag.doe({ soort: 'instelling.zet', sleutel, waarde }, { vervangSleutel: `instelling:${sleutel}` });
+          }
+          modaal.sluit();
+          meld('Werktijd aangepast', 'goed');
+        },
+      },
+    ],
+  });
 }
 
 function beheerSchoonmakers() {
@@ -823,7 +941,15 @@ function tekenHistorieWeek(w, nu) {
           class: `label${percentage === 100 ? ' accent' : percentage < 50 ? ' waarschuwing' : ''}`,
           tekst: `${w.afgevinkt} van ${w.gepland} gedaan`,
         }),
-        w.gewerkteMinuten ? el('span', { class: 'label', tekst: `${alsDuur(w.gewerkteMinuten)} gewerkt` }) : null,
+        w.gewerkteMinuten
+          // Gepland naast gewerkt, zodat je ziet of de schatting klopt.
+          ? el('span', {
+            class: `label${w.geplandeMinuten && w.gewerkteMinuten > w.geplandeMinuten * 1.25 ? ' waarschuwing' : ''}`,
+            tekst: w.geplandeMinuten
+              ? `${alsDuur(w.gewerkteMinuten)} gewerkt · ${alsDuur(w.geplandeMinuten)} gepland`
+              : `${alsDuur(w.gewerkteMinuten)} gewerkt`,
+          })
+          : w.geplandeMinuten ? el('span', { class: 'label stil', tekst: `${alsDuur(w.geplandeMinuten)} gepland` }) : null,
         w.notitie ? el('span', { class: 'label stil', tekst: '✎ notitie' }) : null,
       ]),
       el('span', { class: 'balk', stijl: { marginTop: '8px', display: 'block' } }, [

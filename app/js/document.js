@@ -31,19 +31,28 @@ export const RESULTAAT_LABEL = {
  * Werktijden, in minuten. Er is geen server die kan meekijken, dus alles wordt
  * afgeleid uit de starttijd van het bezoek. Daardoor rekent elk apparaat
  * hetzelfde uit en blijft opnieuw afspelen veilig.
+ *
+ * `herinnerNa` is één getal met twee rollen: het is de beoogde werktijd waar de
+ * weeklijst tegen afgemeten wordt, én het moment waarop het alarm afgaat. Twee
+ * aparte instellingen zouden onvermijdelijk uit de pas gaan lopen.
  */
 export const WERKTIJD = {
-  herinnerNa: 3 * 60,   // eerste herinnering
-  herinnerElke: 60,     // en daarna elk uur opnieuw
-  stopNa: 5 * 60,       // hierna sluit de app het bezoek zelf af
+  herinnerNa: 3 * 60,   // beoogde werktijd; hier gaat het alarm af
+  herinnerElke: 30,     // en daarna elk half uur opnieuw
+  stopNa: 4 * 60,       // hierna sluit de app het bezoek zelf af
 };
 
 export function werktijden(doc) {
   const i = doc?.instellingen || {};
+  const getal = (waarde, standaard) => (Number(waarde) > 0 ? Number(waarde) : standaard);
+  const herinnerNa = getal(i.herinnerNa, WERKTIJD.herinnerNa);
   return {
-    herinnerNa: Number(i.herinnerNa) > 0 ? Number(i.herinnerNa) : WERKTIJD.herinnerNa,
-    herinnerElke: Number(i.herinnerElke) > 0 ? Number(i.herinnerElke) : WERKTIJD.herinnerElke,
-    stopNa: Number(i.stopNa) > 0 ? Number(i.stopNa) : WERKTIJD.stopNa,
+    herinnerNa,
+    budget: herinnerNa,
+    herinnerElke: getal(i.herinnerElke, WERKTIJD.herinnerElke),
+    // Nooit eerder stoppen dan het alarm: anders sluit de app af op het moment
+    // dat zij hem juist nodig heeft.
+    stopNa: Math.max(getal(i.stopNa, WERKTIJD.stopNa), herinnerNa),
   };
 }
 
@@ -503,6 +512,7 @@ export function weekOverzicht(doc, jaar, weeknummer) {
       type: taak.type,
       fotoId: taak.fotoId || null,
       geschatteMinuten: taak.geschatteMinuten,
+      magWachten: !!taak.magWachten,
       ruimteId: taak.ruimteId,
       ruimteNaam: taak.ruimteNaam,
       afgevinkt: !!stand?.afgevinkt,
@@ -521,6 +531,37 @@ export function weekOverzicht(doc, jaar, weeknummer) {
     berichten: (doc.berichten || []).filter((b) => b.week === week.sleutel),
     bezoeken: week.bezoeken,
     onbekend: perTaak.size === 0,
+  };
+}
+
+/**
+ * Wat een lijst taken bij elkaar aan tijd kost, afgezet tegen de beoogde
+ * werktijd. `moet` telt alleen de taken die deze week echt af moeten; dat is
+ * het getal dat moet passen. Wat mag blijven liggen is de buffer.
+ */
+export function tijdBegroting(taken, budget) {
+  const minuten = (lijst) => lijst.reduce((som, t) => som + (t.geschatteMinuten || 0), 0);
+  const moet = taken.filter((t) => !t.magWachten);
+  const wacht = taken.filter((t) => t.magWachten);
+  return {
+    budget,
+    moetMinuten: minuten(moet),
+    wachtMinuten: minuten(wacht),
+    totaalMinuten: minuten(taken),
+    aantalMoet: moet.length,
+    aantalWacht: wacht.length,
+    // Positief betekent: hier past het niet meer binnen de beoogde werktijd.
+    over: minuten(taken) - budget,
+    moetOver: minuten(moet) - budget,
+  };
+}
+
+/** Wat er nog te doen is, gesplitst in wat moet en wat kan blijven liggen. */
+export function watStaatNogOpen(overzicht) {
+  const open = (overzicht.regels || []).filter((r) => !r.afgevinkt);
+  return {
+    moet: open.filter((r) => !r.magWachten),
+    magWachten: open.filter((r) => r.magWachten),
   };
 }
 
@@ -572,10 +613,12 @@ export function weekSamensteller(doc, jaar, weeknummer) {
     };
   });
   const nu = huidigeWeek();
+  const gekozen = alle.filter((t) => t.geselecteerd);
   return {
     week,
     groepen: groepeerPerRuimte(alle),
-    aantalGeselecteerd: alle.filter((t) => t.geselecteerd).length,
+    aantalGeselecteerd: gekozen.length,
+    begroting: tijdBegroting(gekozen, werktijden(doc).budget),
     navigatie: {
       vorige: vorigeWeek(jaar, weeknummer),
       volgende: volgendeWeek(jaar, weeknummer),
@@ -599,6 +642,8 @@ export function historie(doc, limiet = 12) {
         startdatum: week.startdatum,
         notitie: week.notitie || '',
         gepland: standen.length + erbij,
+        geplandeMinuten: tijdBegroting(weekOverzicht(doc, week.jaar, week.weeknummer).regels,
+          werktijden(doc).budget).totaalMinuten,
         afgevinkt: standen.filter((s) => s.afgevinkt).length,
         bezoeken: week.bezoeken || [],
         gewerkteMinuten: gewerkteMinuten(week, new Date(), werktijden(doc).stopNa),

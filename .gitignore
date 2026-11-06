@@ -6,3 +6,7 @@ data/*
 
 .env
 .DS_Store
+
+# Schermafbeeldingen uit de browsertests
+/*.png
+test/browser/*.png

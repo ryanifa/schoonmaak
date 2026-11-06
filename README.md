@@ -131,6 +131,17 @@ weg, ook bij haar. De app onthoudt per week welke taken je toen voor je had, dus
 een opruimtaak die je later aanmaakt komt er alsnog vanzelf bij — die had je nog
 niet beoordeeld.
 
+#### Mag blijven liggen
+
+Los van het type heeft elke taak een vinkje **Mag blijven liggen**. Dat is de
+prioriteit: alles zonder vinkje moet deze week af, alles mét vinkje is wat er
+als eerste afvalt als de tijd op is.
+
+Zij ziet het als een grijs labeltje op haar lijst, midden in de looproute — de
+volgorde per ruimte blijft dus zoals hij is, want één rondje door het huis is
+sneller dan twee. Gaat het alarm af, dan staat er precies wat er nog moet en wat
+ze mag laten liggen.
+
 Daarom heeft zo'n taak twee knoppen in plaats van een vinkje: **Was al in orde**
 en **Heb ik gedaan**. Allebei gelden als afgerond, maar het verschil blijft
 bewaard. In de historie zie je per taak hoe vaak het echt nodig was — bijvoorbeeld
@@ -170,30 +181,56 @@ tijdstempel, en kan ongedaan gemaakt worden.
 De gewerkte tijd komt terug in het beheer: als label bij de week, en in de
 historie per week met de exacte begin- en eindtijden.
 
-#### Als er niet op *klaar* getikt wordt
+#### De beoogde werktijd
 
-Dat gebeurt. Daarom bewaakt de app de tijd zelf:
+In het beheer staat onder **Takenbibliotheek → ⏱ Werktijd** één getal: hoelang
+een schoonmaakbeurt zou moeten duren. Standaard 3 uur. Dat getal doet twee
+dingen tegelijk, en dat is met opzet — twee aparte instellingen zouden
+onvermijdelijk uit de pas gaan lopen.
 
-- **na 3 uur** verschijnt in het werkblok de vraag *"Je bent al 3 uur bezig. Ben
-  je klaar?"*, met daaronder de knop **Nog even door**;
-- daarna **elk uur opnieuw**, tot ze klaar is of doorgeeft dat ze doorgaat;
-- **na 5 uur** sluit de app het bezoek zelf af. In de historie staat er dan
+**Bij het samenstellen** staat boven de weeklijst een tijdbalk: wat je hebt
+ingepland, afgezet tegen die 3 uur, met daaronder de splitsing *"3 uur 30 moet
+deze week af · 25 min mag blijven liggen"*. Zit je erboven, dan kleurt hij rood
+en staat erbij hoeveel te veel het is — en of dat helemaal in de buffer zit of
+ook in wat echt moet. Per ruimte staat het subtotaal in de kop. Zo zie je het
+tijdens het aanvinken, in plaats van achteraf op de urenstaat.
+
+> Even voor de maat: de hele bibliotheek is 4 uur 45 aan werk, en alle wekelijkse
+> taken plus de opruimtaken samen zijn al 3 uur 55. Een volle lijst past dus niet
+> in 3 uur. Dat is geen treuzelen maar rekenen.
+
+**Bij haar** loopt er tijdens het werk een balk mee onder de klok: *"nog 1 uur
+tot 3 uur"*. Gaat ze erover, dan worden de klok en de balk rood.
+
+#### Het alarm, en als er niet op *klaar* getikt wordt
+
+- **Op de beoogde werktijd** (3 uur) verschijnt een rood blok: *"⏰ De 3 uur is
+  om"*, met daaronder wat er nog moet en wat mag blijven liggen — met aantallen
+  en geschatte tijd. Alleen "je bent al 3 uur bezig" helpt haar niet; dan staat
+  ze halverwege de badkamer en weet ze nog steeds niet wat ze mag overslaan.
+  Een knop **Nog even door** zet het weg tot de volgende keer.
+- Daarna **elk half uur opnieuw**, tot ze klaar is.
+- **Na 4 uur** sluit de app het bezoek zelf af. In de historie staat er dan
   "vanzelf afgesloten" bij, zodat een beheerder het verschil ziet.
 
 De eindtijd wordt niet op het moment van afsluiten geprikt maar berekend uit
-`gestartOp + 5 uur`. Elk toestel komt zo op dezelfde tijd uit, en tweemaal
+`gestartOp + 4 uur`. Elk toestel komt zo op dezelfde tijd uit, en tweemaal
 afsluiten verandert niets (de bewerking is idempotent). Het afkappen gebeurt ook
-in de weergave: een nog lopend bezoek van meer dan 5 uur telt nooit langer mee
-dan 5 uur, ook niet als het toestel offline stond.
+in de weergave: een nog lopend bezoek van meer dan 4 uur telt nooit langer mee
+dan 4 uur, ook niet als het toestel offline stond.
 
-Belangrijk om te weten: **de herinnering komt alleen in de app**. Zonder server
-is er geen push-notificatie — staat de telefoon in haar zak met de app dicht,
-dan ziet ze de vraag pas als ze hem weer opent. Het automatisch afsluiten na 5
-uur gebeurt wél altijd, want dat wordt uit de starttijd afgeleid en niet uit een
-timer.
+Belangrijk om te weten: **het alarm komt alleen in de app**. Zonder server is er
+geen push-notificatie — staat de telefoon in haar zak met de app dicht, dan ziet
+ze het pas als ze hem weer opent. Het automatisch afsluiten gebeurt wél altijd,
+want dat wordt uit de starttijd afgeleid en niet uit een timer.
 
 De drie tijden staan als `herinnerNa`, `herinnerElke` en `stopNa` (in minuten)
-in `instellingen`; zonder waarde gelden 180, 60 en 300.
+in `instellingen`; zonder waarde gelden 180, 30 en 240. `stopNa` wordt nooit
+lager dan `herinnerNa` gebruikt — anders zou de app afsluiten op het moment dat
+zij het alarm juist nodig heeft.
+
+In de historie staat bij elke week de gewerkte tijd náást de geplande tijd, zodat
+je over een paar weken ziet of de schattingen kloppen.
 
 ## Slecht netwerk
 
@@ -314,16 +351,21 @@ op een ander apparaat bij is gekomen.
 ## Testen
 
 ```bash
-npm test        # 86 tests
-npm run dev     # bekijk de app lokaal op http://localhost:4321
+npm test           # 104 tests, puur Node
+npm run dev        # bekijk de app lokaal op http://localhost:4321
+npm run browsertest   # in een echte browser; vereist de dev-server hierboven
 ```
 
-De tests draaien ook bij elke push; publiceren gebeurt alleen als ze slagen.
+De Node-tests draaien ook bij elke push; publiceren gebeurt alleen als ze slagen.
+De browsertests (`test/browser/`) hebben Playwright nodig en draaien daarom met
+de hand; zie `test/browser/LEESMIJ.md`. Ze lopen in de **testmodus**, dus er gaat
+niets naar GitHub.
 
 Wat ze afdekken: ISO-weeklogica inclusief jaren met 53 weken; alle bewerkingen op
 het datamodel, inclusief starten, klaar melden en de opruimtaken (die er vanzelf
-bij staan tot je ze wegklikt); dat elke laminaatvloer de waarschuwing tegen nat
-dweilen draagt; en het synchroniseren tegen een
+bij staan tot je ze wegklikt); de tijdbegroting en het alarm, met een verzetbare
+klok; dat elke laminaatvloer de waarschuwing tegen nat dweilen draagt; en het
+synchroniseren tegen een
 **nagebouwde Gist-API** (`test/nep-gist.js`) — gelijktijdig werken op telefoon en
 laptop, een wachtrij die een herstart overleeft, offline openen, een verkeerde
 sleutel, een beschadigd bestand in de Gist, en dat foto's maar één keer worden

@@ -440,3 +440,59 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ---------------------------------------------------- tijdbalk in beheer */
+
+.begroting { margin: 0 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.begroting-kop { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: .9rem; }
+.begroting-kop strong { font-variant-numeric: tabular-nums; }
+.begroting .balk {
+  position: relative; display: flex; height: 12px; border-radius: 999px;
+  background: var(--vlak-zacht); border: 1px solid var(--rand); overflow: hidden;
+}
+.begroting .balk-moet { background: var(--accent); }
+.begroting .balk-wacht { background: var(--accent); opacity: .35; }
+.begroting .balk-grens {
+  position: absolute; top: -3px; bottom: -3px; width: 2px;
+  background: var(--inkt); border-radius: 2px;
+}
+.begroting.te-veel .balk-moet, .begroting.te-veel .balk-wacht { background: var(--fout); }
+.begroting.te-veel .begroting-kop strong { color: var(--fout); }
+.begroting.te-veel > .klein:last-child { color: var(--fout); font-weight: 600; }
+
+/* "mag blijven liggen": zichtbaar, maar rustiger dan de rest */
+.label.wacht { background: var(--vlak-zacht); color: var(--inkt-zacht); border-style: dashed; }
+
+/* Aanvinkregel in een formulier: raakvlak groot genoeg voor een duim */
+.aanvink {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px 12px; border: 1px solid var(--rand); border-radius: var(--radius-klein);
+  background: var(--vlak-zacht); cursor: pointer;
+}
+.aanvink input { width: 20px; height: 20px; margin: 1px 0 0; flex: 0 0 auto; accent-color: var(--accent); }
+.aanvink > span { display: flex; flex-direction: column; gap: 2px; }
+
+/* ------------------------------------------------- tijdbalk en alarm bij haar */
+
+.tijdbalk { margin: 0 0 12px; display: flex; flex-direction: column; gap: 5px; }
+.tijdbalk .balk {
+  position: relative; display: flex; height: 10px; border-radius: 999px;
+  background: var(--vlak-zacht); border: 1px solid var(--rand); overflow: hidden;
+}
+.tijdbalk .balk-vulling { background: var(--accent); }
+.tijdbalk .balk-grens {
+  position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--inkt); border-radius: 2px;
+}
+.tijdbalk.over .balk-vulling { background: var(--fout); }
+.tijdbalk.over > .klein { color: var(--fout); font-weight: 600; }
+
+.herinnering.alarm { background: var(--fout-zacht); border-color: color-mix(in srgb, var(--fout) 30%, transparent); }
+.herinnering.alarm p, .herinnering.alarm .alarm-kop { color: #7d2525; }
+.herinnering.alarm .alarm-kop { font-size: 1.05rem; }
+.alarm-lijst { margin: 0 0 10px; display: flex; flex-direction: column; gap: 8px; }
+.alarm-groep p { margin: 0 0 2px; font-size: .9rem; }
+.alarm-groep p.wacht { opacity: .75; font-weight: 500; }
+.alarm-groep ul { margin: 0; padding-left: 18px; font-size: .88rem; line-height: 1.5; font-weight: 400; }
+.alarm-groep ul .stil { color: var(--inkt-zacht); }
+.werkblok .klok.over { color: var(--fout); }
+.alarm-groep p.wacht { color: var(--inkt-zacht); }

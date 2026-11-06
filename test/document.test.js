@@ -6,7 +6,7 @@ import {
   ruimteLijst, taakLijst, laatstGedaan, haalWeek,
   lopendBezoek, gewerkteMinuten, alsDuur, bezoekMinuten,
   autoStopBewerkingen, herinneringNummer, automatischGestopteBezoeken, werktijden, WERKTIJD,
-  altijdOpDeLijst, resultaatTelling, TAAKTYPES,
+  altijdOpDeLijst, resultaatTelling, TAAKTYPES, tijdBegroting, watStaatNogOpen,
   schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam, historieOmvang,
 } from '../app/js/document.js';
 import { maakVoorbeeldDocument } from '../app/js/seed.js';
@@ -685,14 +685,14 @@ function metLopendBezoek() {
   return pasToe(leegDocument(), { soort: 'bezoek.start', week: W34, id: 'bz', tijd: START });
 }
 
-test('de eerste herinnering komt na drie uur, daarna elk uur', () => {
+test('het alarm komt na drie uur, daarna elk half uur', () => {
   const bezoek = haalWeek(metLopendBezoek(), 2026, 34).bezoeken[0];
   assert.equal(herinneringNummer(bezoek, naUur(1)), null);
   assert.equal(herinneringNummer(bezoek, naUur(2.9)), null, 'net voor drie uur nog niet');
   assert.equal(herinneringNummer(bezoek, naUur(3)), 1);
-  assert.equal(herinneringNummer(bezoek, naUur(3.9)), 1, 'binnen het uur blijft het dezelfde');
-  assert.equal(herinneringNummer(bezoek, naUur(4)), 2);
-  assert.equal(herinneringNummer(bezoek, naUur(5)), 3);
+  assert.equal(herinneringNummer(bezoek, naUur(3.4)), 1, 'binnen het half uur dezelfde');
+  assert.equal(herinneringNummer(bezoek, naUur(3.5)), 2);
+  assert.equal(herinneringNummer(bezoek, naUur(4)), 3);
 });
 
 test('een afgesloten bezoek herinnert nergens meer aan', () => {
@@ -701,18 +701,26 @@ test('een afgesloten bezoek herinnert nergens meer aan', () => {
   assert.equal(herinneringNummer(haalWeek(doc, 2026, 34).bezoeken[0], naUur(9)), null);
 });
 
-test('na vijf uur sluit de app het bezoek zelf af', () => {
+test('na vier uur sluit de app het bezoek zelf af', () => {
   let doc = metLopendBezoek();
-  assert.deepEqual(autoStopBewerkingen(doc, naUur(4.9)), [], 'daarvoor gebeurt er niets');
+  assert.deepEqual(autoStopBewerkingen(doc, naUur(3.9)), [], 'daarvoor gebeurt er niets');
 
-  const bewerkingen = autoStopBewerkingen(doc, naUur(5.1));
+  const bewerkingen = autoStopBewerkingen(doc, naUur(4.1));
   assert.equal(bewerkingen.length, 1);
   doc = speelAf(doc, bewerkingen);
 
   const bezoek = haalWeek(doc, 2026, 34).bezoeken[0];
-  assert.equal(bezoek.gestoptOp, naUur(5).toISOString(), 'precies op de grens, niet op "nu"');
+  assert.equal(bezoek.gestoptOp, naUur(4).toISOString(), 'precies op de grens, niet op "nu"');
   assert.equal(bezoek.automatisch, true);
-  assert.equal(gewerkteMinuten(haalWeek(doc, 2026, 34), naUur(9)), 300);
+  assert.equal(gewerkteMinuten(haalWeek(doc, 2026, 34), naUur(9)), 240);
+});
+
+test('de app stopt nooit vóór het alarm, ook niet bij een rare instelling', () => {
+  let doc = metLopendBezoek();
+  doc = pasToe(doc, { soort: 'instelling.zet', sleutel: 'herinnerNa', waarde: 240 });
+  doc = pasToe(doc, { soort: 'instelling.zet', sleutel: 'stopNa', waarde: 120 });
+  assert.equal(werktijden(doc).stopNa, 240, 'stopNa wordt opgetrokken naar het alarm');
+  assert.deepEqual(autoStopBewerkingen(doc, naUur(3)), [], 'dus niet al na twee uur afgesloten');
 });
 
 test('de eindtijd komt uit de starttijd, dus elk apparaat rekent hetzelfde uit', () => {
@@ -758,4 +766,88 @@ test('bezoekMinuten begrenst één bezoek', () => {
   assert.equal(Math.round(bezoekMinuten(bezoek, naUur(2))), 120);
   assert.equal(Math.round(bezoekMinuten(bezoek, naUur(8))), WERKTIJD.stopNa);
   assert.equal(bezoekMinuten({ gestartOp: null }, naUur(2)), 0);
+});
+
+/* ------------------------------------------------- tijd en prioriteit ---- */
+
+test('de begroting scheidt wat moet van wat mag blijven liggen', () => {
+  const taken = [
+    { id: 'a', geschatteMinuten: 60 },
+    { id: 'b', geschatteMinuten: 90 },
+    { id: 'c', geschatteMinuten: 40, magWachten: true },
+  ];
+  const b = tijdBegroting(taken, 180);
+  assert.equal(b.moetMinuten, 150);
+  assert.equal(b.wachtMinuten, 40);
+  assert.equal(b.totaalMinuten, 190);
+  assert.equal(b.aantalMoet, 2);
+  assert.equal(b.over, 10, 'tien minuten boven de beoogde werktijd');
+  assert.equal(b.moetOver, -30, 'maar wat moet past er ruim in');
+});
+
+test('taken zonder geschatte tijd tellen gewoon als nul', () => {
+  const b = tijdBegroting([{ id: 'a' }, { id: 'b', geschatteMinuten: 20 }], 180);
+  assert.equal(b.totaalMinuten, 20);
+  assert.equal(b.over, -160);
+});
+
+test('een lege week begroot op nul', () => {
+  assert.deepEqual(tijdBegroting([], 180), {
+    budget: 180, moetMinuten: 0, wachtMinuten: 0, totaalMinuten: 0,
+    aantalMoet: 0, aantalWacht: 0, over: -180, moetOver: -180,
+  });
+});
+
+test('de samensteller rekent de begroting van de gekozen taken uit', () => {
+  let doc = maakVoorbeeldDocument();
+  const wekelijks = doc.taken.filter((t) => t.type === 'wekelijks');
+  const minuten = wekelijks.reduce((som, t) => som + (t.geschatteMinuten || 0), 0);
+  doc = pasToe(doc, { soort: 'week.taken', week: W34, taakIds: wekelijks.map((t) => t.id), bekend: doc.taken.map((t) => t.id) });
+
+  const sam = weekSamensteller(doc, 2026, 34);
+  assert.equal(sam.begroting.budget, 180, 'drie uur, zolang niemand het aanpast');
+  assert.equal(sam.begroting.totaalMinuten, minuten);
+  assert.ok(sam.begroting.over > 0, 'alle wekelijkse taken passen niet in drie uur');
+
+  // Eén taak mag blijven liggen: het totaal verandert niet, de verdeling wel.
+  doc = pasToe(doc, { soort: 'taak.bewerk', id: wekelijks[0].id, velden: { magWachten: true } });
+  const na = weekSamensteller(doc, 2026, 34).begroting;
+  assert.equal(na.totaalMinuten, minuten);
+  assert.equal(na.wachtMinuten, wekelijks[0].geschatteMinuten);
+  assert.equal(na.moetMinuten, minuten - wekelijks[0].geschatteMinuten);
+});
+
+test('het alarm weet wat er nog moet en wat kan blijven liggen', () => {
+  let doc = maakVoorbeeldDocument();
+  const [een, twee, drie] = doc.taken.filter((t) => t.type === 'wekelijks');
+  doc = pasToe(doc, { soort: 'taak.bewerk', id: drie.id, velden: { magWachten: true } });
+  doc = pasToe(doc, {
+    soort: 'week.taken', week: W34,
+    taakIds: [een.id, twee.id, drie.id], bekend: doc.taken.map((t) => t.id),
+  });
+  doc = pasToe(doc, { soort: 'weektaak.afvinken', week: W34, taakId: een.id, afgevinkt: true, tijd: 't' });
+
+  const open = watStaatNogOpen(weekOverzicht(doc, 2026, 34));
+  assert.deepEqual(open.moet.map((r) => r.taakId), [twee.id], 'de afgevinkte telt niet meer mee');
+  assert.deepEqual(open.magWachten.map((r) => r.taakId), [drie.id]);
+});
+
+test('de prioriteit komt mee in haar weeklijst', () => {
+  let doc = maakVoorbeeldDocument();
+  const taak = doc.taken.find((t) => t.type === 'wekelijks');
+  doc = pasToe(doc, { soort: 'week.taken', week: W34, taakIds: [taak.id], bekend: doc.taken.map((t) => t.id) });
+  assert.equal(weekOverzicht(doc, 2026, 34).regels[0].magWachten, false, 'standaard moet alles');
+
+  doc = pasToe(doc, { soort: 'taak.bewerk', id: taak.id, velden: { magWachten: true } });
+  assert.equal(weekOverzicht(doc, 2026, 34).regels[0].magWachten, true);
+});
+
+test('de historie toont naast de gewerkte ook de geplande tijd', () => {
+  let doc = maakVoorbeeldDocument();
+  const taken = doc.taken.filter((t) => t.type === 'wekelijks').slice(0, 3);
+  const minuten = taken.reduce((som, t) => som + (t.geschatteMinuten || 0), 0);
+  doc = pasToe(doc, { soort: 'week.taken', week: W34, taakIds: taken.map((t) => t.id), bekend: doc.taken.map((t) => t.id) });
+
+  const w = historie(doc).find((x) => x.weeknummer === 34);
+  assert.equal(w.geplandeMinuten, minuten);
 });

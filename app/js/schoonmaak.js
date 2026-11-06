@@ -9,7 +9,7 @@ import { toonModaal } from './modaal.js';
 import { meld } from './melding.js';
 import {
   weekOverzicht, weekSleutel, nieuwId, lopendBezoek, gewerkteMinuten, alsDuur,
-  automatischGestopteBezoeken, herinneringNummer, werktijden,
+  automatischGestopteBezoeken, herinneringNummer, werktijden, watStaatNogOpen,
   schoonmakerLijst, standaardSchoonmaker, schoonmakerNaam,
 } from './document.js';
 import { sluitVergetenBezoeken, alGezien, onthoudGezien } from './werktijd.js';
@@ -150,7 +150,12 @@ function tekenWerkblok() {
 
   if (lopend) {
     const sinds = new Date(lopend.gestartOp);
-    const klok = el('div', { class: 'klok', tekst: minuten < 1 ? 'net begonnen' : alsDuur(minuten) });
+    const klok = el('div', {
+      // Rood zodra ze over de beoogde werktijd heen is: dat is het eerste wat
+      // ze ziet als ze de telefoon erbij pakt.
+      class: `klok${minuten > tijden().budget ? ' over' : ''}`,
+      tekst: minuten < 1 ? 'net begonnen' : alsDuur(minuten),
+    });
     const wie = schoonmakerNaam(opslag.document(), lopend.schoonmakerId);
     doel.append(el('div', { class: 'werkblok bezig' }, [
       klok,
@@ -159,7 +164,8 @@ function tekenWerkblok() {
         tekst: [wie, `bezig sinds ${sinds.getHours()}:${String(sinds.getMinutes()).padStart(2, '0')}`]
           .filter(Boolean).join(' · '),
       }),
-      tekenHerinnering(lopend),
+      tekenTijdbalk(minuten),
+      tekenAlarm(lopend),
       el('button', { class: 'knop primair vol', type: 'button', tekst: '✓ Ik ben klaar', onclick: meldKlaar }),
     ]));
     // De klok loopt door zolang deze weergave in beeld is; ondertussen kijken we
@@ -167,6 +173,7 @@ function tekenWerkblok() {
     klokTimer = setInterval(() => {
       const gelopen = gewerkteMinuten(overzicht.week);
       klok.textContent = gelopen < 1 ? 'net begonnen' : alsDuur(gelopen);
+      klok.classList.toggle('over', gelopen > tijden().budget);
       if (sluitVergetenBezoeken(opslag)) return;             // teken() volgt vanzelf
       if (herinneringNummer(lopend, new Date(), tijden()) > alGezien(lopend.id)) teken();
     }, 20000);
@@ -223,20 +230,65 @@ function tijden() {
   return werktijden(opslag.document());
 }
 
+/** Hoe ver ze is ten opzichte van de beoogde werktijd. Loopt mee met de klok. */
+function tekenTijdbalk(minuten) {
+  const { budget } = tijden();
+  const over = minuten - budget;
+  const schaal = Math.max(budget, minuten, 1);
+  return el('div', { class: `tijdbalk${over > 0 ? ' over' : ''}` }, [
+    el('div', { class: 'balk' }, [
+      el('span', { class: 'balk-vulling', stijl: { width: `${(minuten / schaal) * 100}%` } }),
+      over > 0 ? el('span', { class: 'balk-grens', stijl: { left: `${(budget / schaal) * 100}%` } }) : null,
+    ]),
+    el('div', {
+      class: 'klein stil',
+      tekst: over > 0
+        ? `${alsDuur(over)} over de ${alsDuur(budget)}`
+        : `nog ${alsDuur(budget - minuten)} tot ${alsDuur(budget)}`,
+    }),
+  ]);
+}
+
 /**
- * Na drie uur even vragen of ze klaar is, en daarna elk uur opnieuw. Bewust
- * geen venster dat het scherm overneemt: ze is aan het werk.
+ * Het alarm als de beoogde werktijd om is. Alleen zeggen "je bent al 3 uur
+ * bezig" helpt haar niet: dan staat ze halverwege de badkamer. Daarom staat
+ * erbij wat er nog moet en wat ze mag laten liggen.
  */
-function tekenHerinnering(lopend) {
+function tekenAlarm(lopend) {
   const t = tijden();
   const nummer = herinneringNummer(lopend, new Date(), t);
   if (!nummer || nummer <= alGezien(lopend.id)) return null;
 
   const bezig = Math.round((new Date() - new Date(lopend.gestartOp)) / 60000);
   const resterend = Math.max(0, t.stopNa - bezig);
+  const open = watStaatNogOpen(overzicht);
 
-  return el('div', { class: 'herinnering' }, [
-    el('p', { tekst: `Je bent al ${alsDuur(bezig)} bezig. Ben je klaar?` }),
+  const groepje = (titel, regels, klasse) => {
+    if (!regels.length) return null;
+    const minuten = regels.reduce((som, r) => som + (r.geschatteMinuten || 0), 0);
+    const toon = regels.slice(0, 5);
+    return el('div', { class: 'alarm-groep' }, [
+      el('p', {
+        class: klasse,
+        tekst: `${titel}: ${meervoud(regels.length, 'taak', 'taken')}${minuten ? ` · ± ${alsDuur(minuten)}` : ''}`,
+      }),
+      el('ul', {}, [
+        ...toon.map((r) => el('li', { tekst: `${r.ruimteNaam} — ${r.titel}` })),
+        regels.length > toon.length
+          ? el('li', { class: 'stil', tekst: `en nog ${regels.length - toon.length}` }) : null,
+      ]),
+    ]);
+  };
+
+  return el('div', { class: 'herinnering alarm' }, [
+    el('p', { class: 'alarm-kop', tekst: `⏰ De ${alsDuur(t.budget)} is om` }),
+    el('p', { class: 'hulp', tekst: `Je bent nu ${alsDuur(bezig)} bezig.` }),
+    open.moet.length || open.magWachten.length
+      ? el('div', { class: 'alarm-lijst' }, [
+        groepje('Dit moet nog', open.moet, 'moet'),
+        groepje('Dit mag blijven liggen', open.magWachten, 'wacht'),
+      ])
+      : el('p', { class: 'hulp', tekst: 'Alles staat afgevinkt. Je kunt afronden.' }),
     el('p', {
       class: 'hulp',
       tekst: resterend
@@ -369,11 +421,12 @@ function tekenTaak(taak) {
     el('span', { class: 'taak-midden' }, [
       el('span', { class: 'taak-titel', tekst: taak.titel }),
       taak.omschrijving ? el('span', { class: 'taak-omschrijving', tekst: taak.omschrijving }) : null,
-      taak.afgevinkt && taak.afgevinktOp
-        ? el('span', { class: 'taak-meta' }, [
-          el('span', { class: 'label accent', tekst: `Gedaan ${tijdstempel(taak.afgevinktOp)}` }),
-        ])
-        : null,
+      el('span', { class: 'taak-meta' }, [
+        taak.afgevinkt && taak.afgevinktOp
+          ? el('span', { class: 'label accent', tekst: `Gedaan ${tijdstempel(taak.afgevinktOp)}` }) : null,
+        !taak.afgevinkt && taak.magWachten
+          ? el('span', { class: 'label wacht', tekst: 'mag blijven liggen' }) : null,
+      ]),
     ]),
   ]);
 
@@ -420,6 +473,7 @@ function tekenOpruimtaak(taak) {
           ])
           : el('span', { class: 'taak-meta' }, [
             el('span', { class: 'label', tekst: 'kijk zelf of het nodig is' }),
+            taak.magWachten ? el('span', { class: 'label wacht', tekst: 'mag blijven liggen' }) : null,
           ]),
       ]),
     ]),
