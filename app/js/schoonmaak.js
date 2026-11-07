@@ -390,19 +390,30 @@ function tekenVoortgang({ gedaan, totaal }) {
   const doel = leeg($('#voortgang'));
   if (!totaal) return;
   const percentage = Math.round((gedaan / totaal) * 100);
-  doel.append(
+  // Hoeveel werk er nog ligt. Naast de klok in het werkblok is dat het getal
+  // waarmee ze zelf kan zien of het gaat passen — niet pas bij het alarm.
+  const open = watStaatNogOpen(overzicht);
+  const rest = [...open.moet, ...open.magWachten];
+  const restMinuten = rest.reduce((som, r) => som + (r.geschatteMinuten || 0), 0);
+  // voegToe en niet append: append(null) zet het woord "null" op het scherm.
+  voegToe(doel,
     el('div', { class: 'voortgang-tekst' }, [
       el('span', {}, [el('strong', { tekst: `${gedaan} van de ${totaal}` }), ' taken gedaan']),
       el('span', { tekst: `${percentage}%` }),
     ]),
+    rest.length
+      ? el('div', {
+        class: 'klein stil voortgang-rest',
+        tekst: `nog ${meervoud(rest.length, 'taak', 'taken')}${restMinuten ? ` · ± ${alsDuur(restMinuten)}` : ''}`,
+      })
+      : null,
     el('div', {
       class: 'balk', role: 'progressbar',
       'aria-valuenow': gedaan, 'aria-valuemin': 0, 'aria-valuemax': totaal,
       'aria-label': `${gedaan} van de ${totaal} taken gedaan`,
     }, [
       el('div', { class: `balk-vulling${gedaan === totaal ? ' klaar' : ''}`, stijl: { width: `${percentage}%` } }),
-    ]),
-  );
+    ]));
 }
 
 // Wat de knoppen bij een opruimtaak zeggen, vanuit haar gezien.
@@ -425,6 +436,9 @@ function tekenTaak(taak) {
       el('span', { class: 'taak-meta' }, [
         taak.afgevinkt && taak.afgevinktOp
           ? el('span', { class: 'label accent', tekst: `Gedaan ${tijdstempel(taak.afgevinktOp)}` }) : null,
+        // Een schatting, geen norm — vandaar het rustige grijs en de ±.
+        !taak.afgevinkt && taak.geschatteMinuten
+          ? el('span', { class: 'label stil', tekst: `± ${taak.geschatteMinuten} min` }) : null,
         !taak.afgevinkt && taak.magWachten
           ? el('span', { class: 'label wacht', tekst: 'mag blijven liggen' }) : null,
       ]),
@@ -474,6 +488,7 @@ function tekenOpruimtaak(taak) {
           ])
           : el('span', { class: 'taak-meta' }, [
             el('span', { class: 'label', tekst: 'kijk zelf of het nodig is' }),
+            taak.geschatteMinuten ? el('span', { class: 'label stil', tekst: `± ${taak.geschatteMinuten} min` }) : null,
             taak.magWachten ? el('span', { class: 'label wacht', tekst: 'mag blijven liggen' }) : null,
           ]),
       ]),

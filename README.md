@@ -220,7 +220,17 @@ tijdens het aanvinken, in plaats van achteraf op de urenstaat.
 > in 3 uur. Dat is geen treuzelen maar rekenen.
 
 **Bij haar** loopt er tijdens het werk een balk mee onder de klok: *"nog 1 uur
-tot 3 uur"*. Gaat ze erover, dan worden de klok en de balk rood.
+tot 3 uur"*. Gaat ze erover, dan worden de klok en de balk rood. Daaronder staat
+bij de voortgang hoeveel werk er nog ligt: *"nog 22 taken · ± 3 uur 40"*, dat
+meeloopt met het afvinken. Die twee regels onder elkaar zijn het punt — zo ziet
+ze om half elf al dat het niet gaat passen, in plaats van pas bij het alarm.
+
+Op elke openstaande taak staat de schatting als een rustig grijs *"± 10 min"*,
+naast "mag blijven liggen". Zonder dat kan ze er ook niets over terugkoppelen:
+wie nooit ziet dat jij tien minuten voor de douche rekende, kan niet melden dat
+het er twintig zijn. Een afgevinkte taak laat het weg; daar valt niets meer aan
+te plannen. Het is met opzet dezelfde stille opmaak als in het beheerscherm — een
+schatting, geen norm.
 
 #### Het alarm, en als er niet op *klaar* getikt wordt
 
